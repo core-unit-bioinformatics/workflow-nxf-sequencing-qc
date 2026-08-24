@@ -31,10 +31,12 @@ workflow EXOMEQC {
 
     // Collect output files for multiQC
     // using the nf-schema samplesheetToList function for adding directories to multiqc via config file
-    channel
-        .fromList(samplesheetToList(params.multiqc_inputs, "${projectDir}/assets/multiqc_input_schema.json"))
-        .set { ch_multiqc_inputs }
-    ch_multiqc_files = ch_multiqc_files.mix(ch_multiqc_inputs)
+    if(params.multiqc_inputs) {
+        channel
+            .fromList(samplesheetToList(params.multiqc_inputs, "${projectDir}/assets/multiqc_input_schema.json"))
+            .set { ch_multiqc_inputs }
+        ch_multiqc_files = ch_multiqc_files.mix(ch_multiqc_inputs)
+    }
 
     if (params.enable_fastqscreen) {
         if (!params.fastqscreen_database) {
