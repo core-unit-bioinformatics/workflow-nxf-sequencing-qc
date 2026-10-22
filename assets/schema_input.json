@@ -42,6 +42,12 @@
                 "pattern": "^([\\S\\s]*\\/)?[^\\s\\/]+\\.vcf(\\.gz)?$",
                 "errorMessage": "VCF file cannot contain spaces and must have extension '.vcf' or '.vcf.gz'",
                 "meta": ["vcf"]
+            },
+            "runid": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]+$",
+                "errorMessage": "RUNID of the sequencing run (e.g. 20251203_LH00535_0112_A22F5NWLT1) may only contain A-Z, a-z, 0-9, '.', '_' and '-'",
+                "meta": ["runid"]
             }
         },
         "required": ["sample"]
