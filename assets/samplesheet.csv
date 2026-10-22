@@ -1,3 +1,3 @@
-sample,fastq_1,fastq_2,bam,vcf
-SAMPLE_TUMOR,/path/to/fastq/files/sample_tumor_R1.fastq.gz,/path/to/fastq/files/sample_tumor_R2.fastq.gz,/path/to/bam/files/sample_tumor.bam,/path/to/vcf/files/sample_tumor.vcf.gz
-SAMPLE_NORMAL,/path/to/fastq/files/sample_normal_R1.fastq.gz,/path/to/fastq/files/sample_normal_R2.fastq.gz,/path/to/bam/files/sample_normal.bam,
+sample,fastq_1,fastq_2,bam,vcf,runid
+SAMPLE_TUMOR,/path/to/fastq/files/sample_tumor_R1.fastq.gz,/path/to/fastq/files/sample_tumor_R2.fastq.gz,/path/to/bam/files/sample_tumor.bam,/path/to/vcf/files/sample_tumor.vcf.gz,20251203_LH00535_0112_A22F5NWLT1
+SAMPLE_NORMAL,/path/to/fastq/files/sample_normal_R1.fastq.gz,/path/to/fastq/files/sample_normal_R2.fastq.gz,/path/to/bam/files/sample_normal.bam,,20251203_LH00535_0112_A22F5NWLT1

@@ -187,6 +187,16 @@ def validateInputSamplesheet(input) {
         error("Please check input samplesheet -> All rows of a sample must have the same 'vcf' (or leave it empty in all rows): sample ${metas[0].id} has ${vcfs.collect { vcf -> vcf ?: '<empty>' }.join(', ')}")
     }
 
+    // Rows of the same sample are merged into one entry, so they must agree on bam and runid;
+    // otherwise only the first row's values would be used. Fingerprint the same sample from
+    // several sequencing runs via --fingerprint_database instead.
+    ['bam', 'runid'].each { column ->
+        def values = metas.collect { meta -> meta[column] ? meta[column].toString() : '' }.unique()
+        if (values.size() != 1) {
+            error("Please check input samplesheet -> rows of sample '${metas[0].id}' differ in column '${column}' (observed: ${values.collect { value -> value ?: '<empty>' }.join(', ')}); give each sample once per samplesheet, with one '${column}' value")
+        }
+    }
+
     return [ metas[0], fastqs ]
 }
 //
