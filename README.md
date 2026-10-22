@@ -24,7 +24,17 @@
 
 <!-- TODO nf-core: Include a figure that guides the user through the major workflow steps. Many nf-core
      workflows use the "tube map" design for that. See https://nf-co.re/docs/guidelines/graphic_design/workflow_diagrams#examples for examples.   -->
-<!-- TODO nf-core: Fill in short bullet-pointed list of the default steps in the pipeline -->2. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
+<!-- TODO nf-core: Fill in short bullet-pointed list of the default steps in the pipeline -->
+
+1. Fingerprint check (`--enable_fingerprintcheck`)
+   - crosscheck all BAMs of the run with each other ([`Picard CrosscheckFingerprints`](https://broadinstitute.github.io/picard/)), shown as heatmap
+   - optionally align samples without BAM ([`bwa-mem2`](https://github.com/bwa-mem2/bwa-mem2), `--align_reads_for_fingerprint`)
+   - extract one fingerprint per sample and run (`<sample>@<runid>`, [`Picard ExtractFingerprint`](https://broadinstitute.github.io/picard/))
+   - merge them with the fingerprint database of previous runs ([`bcftools`](https://samtools.github.io/bcftools/), `--fingerprint_database`) and write the updated database for the next run
+   - crosscheck the run against the database and report matches with samples of other runs, with LOD scores
+2. Contamination screening ([`FastQ Screen`](https://www.bioinformatics.babraham.ac.uk/projects/fastq_screen/), `--enable_fastqscreen`)
+3. DRAGEN CNV QC (`--enable_cnvqc`)
+4. Present QC ([`MultiQC`](http://multiqc.info/))
 
 ## Usage
 

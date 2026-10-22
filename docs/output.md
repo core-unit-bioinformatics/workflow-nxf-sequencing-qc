@@ -12,12 +12,41 @@ The directories listed below will be created in the results directory after the 
 
 The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes data using the following steps:
 
-
+- [Fingerprint check](#fingerprint-check) - Sample identity checks within the run and against the fingerprint database of previous runs
 - [FastQ Screen](#fastq-screen) - Read-level contamination screening against multiple reference genomes
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
 
+### Fingerprint check
 
+<details markdown="1">
+<summary>Output files</summary>
+
+- `fingerprintcheck/`
+  - `crosscheck.crosscheck_metrics.txt`: Picard CrosscheckFingerprints of all BAMs of this run against each other; shown as table and heatmap in MultiQC.
+  - `fingerprints/<sample>_<runid>.fingerprint.vcf.gz` (+ `.tbi`): fingerprint of each sample (Picard ExtractFingerprint), VCF sample name `<sample>@<runid>`, FORMAT fields `AD`, `DP`, `PL` at the haplotype map SNPs.
+  - `database/`
+    - `exomeqc_fingerprint_database.vcf.gz` (+ `.tbi`): updated fingerprint database, i.e. the given `--fingerprint_database` without the fingerprints replaced by this run, plus all fingerprints of this run. Use it as `--fingerprint_database` of the next run.
+    - `fingerprint_database.crosscheck_metrics.txt`: Picard CrosscheckFingerprints of this run's fingerprints against the updated database (all pairs). Not read by MultiQC.
+    - `fingerprint_database_matches.tsv`: reported comparisons with fingerprints of other runs (see below).
+    - `fingerprint_database_summary.tsv`: counts (`metric`, `value`): `lod_threshold`, `run_samples`, `previous_database_samples`, `replaced_fingerprints`, `database_samples`, `previous_runs_database_samples`, `comparisons_read`, `comparisons_same_run_dropped`, `comparisons_other_runs`, `unexpected_match`, `unexpected_mismatch`, `expected_match`, `inconclusive_same_sample`, `inconclusive_other_sample`, `expected_mismatch`, `reported_comparisons`.
+    - `fingerprint_database_matches_mqc.tsv` or, when nothing is reported, `fingerprint_database_matches_mqc.html`: MultiQC section "Crosscheck Fingerprints: Database matches".
+
+</details>
+
+Columns of `fingerprint_database_matches.tsv`:
+
+| Column                   | Description                                                                                         |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| `sample`, `runid`        | Sample of this run                                                                                  |
+| `database_sample`        | Sample ID of the database fingerprint                                                               |
+| `database_runid`         | Run of the database fingerprint                                                                     |
+| `status`                 | `UNEXPECTED_MATCH`, `UNEXPECTED_MISMATCH`, `INCONCLUSIVE` (same sample ID only) or `EXPECTED_MATCH` |
+| `lod_score`              | LOD score: log10 likelihood ratio of same vs different individual                                   |
+| `lod_score_tumor_normal` | Tumor-aware LOD score with the sample of this run as tumor                                          |
+| `lod_score_normal_tumor` | Tumor-aware LOD score with the sample of this run as normal                                         |
+
+Rows are sorted by status (unexpected results first), sample and descending LOD. See [usage](usage.md#fingerprint-check-and-fingerprint-database) for the classification.
 
 ### FastQ Screen
 

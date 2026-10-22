@@ -1,0 +1,133 @@
+{
+    "-profile test": {
+        "content": [
+            {
+                "BCFTOOLS_MERGE": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_VIEW": {
+                    "bcftools": "1.23.1"
+                },
+                "BWAMEM2_INDEX": {
+                    "bwamem2": "2.2.1"
+                },
+                "BWAMEM2_MEM": {
+                    "bwamem2": "2.2.1",
+                    "samtools": "1.22.1"
+                },
+                "FINGERPRINT_DATABASE_REPORT": {
+                    "python": "3.8.3"
+                },
+                "PICARD_CREATESEQUENCEDICTIONARY": {
+                    "picard": "3.5.0"
+                },
+                "PICARD_CROSSCHECKFINGERPRINTS": {
+                    "picard": "3.4.0"
+                },
+                "PICARD_CROSSCHECKFINGERPRINTS_DATABASE": {
+                    "picard": "3.4.0"
+                },
+                "PICARD_EXTRACTFINGERPRINT": {
+                    "picard": "3.5.0"
+                },
+                "SAMTOOLS_FAIDX": {
+                    "samtools": 1.24
+                },
+                "SAMTOOLS_INDEX": {
+                    "samtools": "1.23.1"
+                },
+                "Workflow": {
+                    "core-unit-bioinformatics/exomeqc": "v1.0.0"
+                }
+            },
+            [
+                "fingerprintcheck",
+                "fingerprintcheck/crosscheck.crosscheck_metrics.txt",
+                "fingerprintcheck/database",
+                "fingerprintcheck/database/exomeqc_fingerprint_database.vcf.gz",
+                "fingerprintcheck/database/exomeqc_fingerprint_database.vcf.gz.tbi",
+                "fingerprintcheck/database/fingerprint_database.crosscheck_metrics.txt",
+                "fingerprintcheck/database/fingerprint_database_matches.tsv",
+                "fingerprintcheck/database/fingerprint_database_matches_mqc.tsv",
+                "fingerprintcheck/database/fingerprint_database_summary.tsv",
+                "fingerprintcheck/fingerprints",
+                "fingerprintcheck/fingerprints/100-26_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/100-26_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/200-26_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/200-26_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/300-26_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/300-26_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/400-26_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/400-26_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
+                "multiqc",
+                "multiqc/Exome-Sequencing_multiqc_report.html",
+                "multiqc/Exome-Sequencing_multiqc_report_data",
+                "multiqc/Exome-Sequencing_multiqc_report_data/llms-full.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/multiqc.log",
+                "multiqc/Exome-Sequencing_multiqc_report_data/multiqc.parquet",
+                "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_citations.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_data.json",
+                "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_exomeqc_fingerprint_database_table.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_general_stats.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_picard-crosscheckfingerprints-table_table.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_software_versions.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_sources.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/picard-crosscheckfingerprints-heatmap.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/picard-crosscheckfingerprints-sample-table.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/picard-crosscheckfingerprints-table.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/picard_MarkIlluminaAdapters_histogram.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/picard_MeanQualityByCycle_histogram.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/picard_MeanQualityByCycle_histogram_1.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/picard_QualityScoreDistribution_histogram.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_data/picard_crosscheckfingerprints.txt",
+                "multiqc/Exome-Sequencing_multiqc_report_plots",
+                "multiqc_inputs_test.csv",
+                "pipeline_info",
+                "pipeline_info/exomeqc_software_mqc_versions.yml",
+                "samplesheet_test.csv",
+                "samtools",
+                "samtools/100-26_3-N_20260201_LH00001_0002_BFIXTURE02.bam.bai",
+                "samtools/200-26_1-T_20260201_LH00001_0002_BFIXTURE02.bam.bai",
+                "samtools/300-26_1-T_20260201_LH00001_0002_BFIXTURE02.bam.bai",
+                "samtools/400-26_3-N_20260201_LH00001_0002_BFIXTURE02.aligned.bam.bai"
+            ],
+            [
+                "fingerprint_database_matches.tsv:md5,a6830dacb3ec526d7a859a3dfb13a1d6",
+                "fingerprint_database_matches_mqc.tsv:md5,d4b84a34de5b5df51affab8ceef01373",
+                "fingerprint_database_summary.tsv:md5,840f80bb88e068800e57eeb91c70ede8",
+                "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
+                "multiqc_exomeqc_fingerprint_database_table.txt:md5,1b24601c71965e3dce9c55ea03e4bae1",
+                "multiqc_general_stats.txt:md5,edaeadb76de9a261d13744ea75a82102",
+                "multiqc_software_versions.txt:md5,a4921fd47a0e9b724ce4ab5e00ae3648",
+                "picard-crosscheckfingerprints-sample-table.txt:md5,c29e93de76cdde05146863b35b31852c",
+                "picard_MarkIlluminaAdapters_histogram.txt:md5,d41d8cd98f00b204e9800998ecf8427e",
+                "picard_MeanQualityByCycle_histogram.txt:md5,d41d8cd98f00b204e9800998ecf8427e",
+                "picard_MeanQualityByCycle_histogram_1.txt:md5,d41d8cd98f00b204e9800998ecf8427e",
+                "picard_QualityScoreDistribution_histogram.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+            ],
+            [
+                "100-26_3-N 100-26_3-N 45.379291",
+                "100-26_3-N 200-26_1-T -137.912843",
+                "100-26_3-N 300-26_1-T 45.369513",
+                "100-26_3-N 400-26_3-N -118.156629",
+                "200-26_1-T 100-26_3-N -137.912843",
+                "200-26_1-T 200-26_1-T 45.052624",
+                "200-26_1-T 300-26_1-T -136.695188",
+                "200-26_1-T 400-26_3-N -104.718094",
+                "300-26_1-T 100-26_3-N 45.369513",
+                "300-26_1-T 200-26_1-T -136.695188",
+                "300-26_1-T 300-26_1-T 45.359991",
+                "300-26_1-T 400-26_3-N -117.463955",
+                "400-26_3-N 100-26_3-N -118.156629",
+                "400-26_3-N 200-26_1-T -104.718094",
+                "400-26_3-N 300-26_1-T -117.463955",
+                "400-26_3-N 400-26_3-N 45.550181"
+            ]
+        ],
+        "timestamp": "2026-10-22T21:47:38.937026789",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}

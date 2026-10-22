@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - VAF as in cio-abcd/variantinterpretation: FORMAT/AF, or FORMAT/AD[alt] / FORMAT/DP; `auto` uses FORMAT/AF if the VCF header declares it, else FORMAT/AD + DP. The source per VCF is logged and written to the summary. A VCF without the needed FORMAT fields, or a counted variant without a value, stops the pipeline with an `ERROR` (no fallback). Each ALT allele counts as one variant; with FORMAT/GT only the ALT alleles in the sample's genotype count (hom-ref/no-call skipped and counted); records with FILTER `.` (no filters applied) count like PASS and are logged; bin edges use decimal arithmetic.
   - Report change: the MultiQC report gains this section; no existing section or output changes.
   - Synthetic test VCFs in DRAGEN, Mutect2 and FreeBayes format (`tests/fixtures/vaf_histogram/`, with their generator script), pytest unit tests (`tests/python/test_vaf_histogram.py`), nf-tests for the module and a pipeline test (`tests/vaf_histogram.nf.test`).
+- Fingerprint database across sequencing runs _(Implemented with support from Claude (Anthropic).)_:
+  - Picard ExtractFingerprint writes one fingerprint VCF per sample, named `<sample>@<runid>` (`fingerprintcheck/fingerprints/`).
+  - The fingerprints are merged with the database of previous runs (new parameter `--fingerprint_database`, optional) into an updated database, `fingerprintcheck/database/exomeqc_fingerprint_database.vcf.gz`, to be passed to the next run. Fingerprints of this run already in the given database (same `<sample>@<runid>`) are replaced, logged as `WARNING` and counted.
+  - Picard CrosscheckFingerprints compares every sample of this run with every fingerprint in the updated database. `bin/fingerprint_database_report.py` classifies the comparisons with other runs by LOD score (new parameter `--fingerprint_database_lod_threshold`, default 5) and writes `fingerprint_database_matches.tsv`, `fingerprint_database_summary.tsv` and the MultiQC section "Crosscheck Fingerprints: Database matches" (unexpected matches, mismatches and inconclusive comparisons of the same sample ID, and expected matches, with LOD scores). It is placed right after the Picard sections.
+  - Optional alignment of samples without BAM with bwa-mem2 (new parameters `--align_reads_for_fingerprint`, default `false`, and `--bwamem2_index`).
+  - New parameters `--fasta_fai` and `--fasta_dict`; both are created from `--fasta` if not given.
+  - Synthetic test data for the fingerprint check (`tests/fixtures/fingerprint/`, with its generator script), pytest unit tests for the report script and nf-tests for the new module and the subworkflow.
 
 ### `Fixed`
 
@@ -33,6 +40,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The stub of `DRAGEN_CNV_QC` now creates the same files as a real run with the default `ext.args` (`cnv-metrics.csv`, `purcov_maxmodel_lineplot.json`, `karyoplot-*_mqc.png`, with `ext.prefix`).
 - `DRAGEN_CNV_QC` failed with a missing-output error if the DRAGEN output had no `*.cnv.purity.coverage.models.tsv` (no `*.json`) or no `*.tn.tsv.gz`/`*.tumor.baf.bedgraph.gz` (no `*.png`). These outputs are now optional, as documented in `docs/usage.md`. No change in results.
 - `bin/analyze_cnv_metrics.R` was committed without the executable bit (mode 100644), so `DRAGEN_CNV_QC` failed with `Permission denied` (exit 126) when run from a fresh clone. It is now executable (100755). No change in results.
+
+### `Changed`
+
+- Samplesheet: new column `runid`, required with `--enable_fingerprintcheck`. With the fingerprint check, `sample` and `runid` may only contain `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`.
+- `--fasta` (the reference the BAMs are aligned to) is now required with `--enable_fingerprintcheck`, because Picard ExtractFingerprint needs it. It must be uncompressed.
+- Rows without `bam` now stop the pipeline with an `ERROR` when the fingerprint check is on and `--align_reads_for_fingerprint` is not set. Before, such rows were silently left out of the fingerprint check (the check for the `bam` column never failed).
+- Rows of the same `sample` that differ in `bam` or `runid` now stop the pipeline with an `ERROR`. Before, the values of the first row were used silently.
+- Results: the crosscheck of this run's BAMs (`fingerprintcheck/crosscheck.crosscheck_metrics.txt`, Picard 3.4.0, same arguments) has the same LOD scores and results as v1.1.1 for samples with a BAM (compared on the synthetic test data). As before, the order of the samples in the heatmap is set by Picard and can differ between runs. Samples aligned with `--align_reads_for_fingerprint` are added to it. The MultiQC report gains the new database section.
+- MultiQC: `fingerprint_database.crosscheck_metrics.txt` is excluded from the Picard module (`sp.picard/crosscheckfingerprints.exclude_fn`), so database samples never enter the heatmap.
+
+### `Dependencies`
+
+- New nf-core modules: `picard/extractfingerprint` (Picard 3.5.0), `bcftools/view` and `bcftools/merge` (bcftools 1.23.1), `bwamem2/index` and `bwamem2/mem` (bwa-mem2 2.3, whose binary reports version 2.2.1; samtools 1.22.1), `samtools/faidx` (samtools 1.24), `picard/createsequencedictionary` (Picard 3.5.0).
+- New local module `fingerprint_database_report` (Python 3.8.3, standard library only).
 
 ## v0.1dev - [date]
 

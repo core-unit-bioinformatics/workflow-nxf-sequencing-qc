@@ -234,7 +234,8 @@ def toolCitationText() {
     def citation_text = [
             "Tools used in the workflow included:",
             params.enable_fastqscreen ? "FastQ Screen (Wingett and Andrews 2018)," : "",
-            params.enable_fingerprintcheck ? "Picard CrosscheckFingerprints (Picard Toolkit, Broad Institute)," : "",
+            params.enable_fingerprintcheck ? "Picard CrosscheckFingerprints and ExtractFingerprint (Picard Toolkit, Broad Institute), SAMtools and BCFtools (Danecek et al. 2021)," : "",
+            params.enable_fingerprintcheck && params.align_reads_for_fingerprint ? "BWA-MEM2 (Vasimuddin et al. 2019)," : "",
             "MultiQC (Ewels et al. 2016)",
             "."
         ].join(' ').trim()
@@ -248,7 +249,9 @@ def toolBibliographyText() {
     // Uncomment function in methodsDescriptionText to render in MultiQC report
     def reference_text = [
             params.enable_fastqscreen ? "<li>Wingett, S. W., & Andrews, S. FastQ Screen: A tool for multi-genome mapping and quality control [version 2; referees: 4 approved]. F1000Research 2018, 7:1338. <a href='https://doi.org/10.12688/f1000research.15931.2'>https://doi.org/10.12688/f1000research.15931.2</a></li>" : "",
-            params.enable_fingerprintcheck ? "<li>Picard Toolkit. Broad Institute, GitHub Repository. <a href='https://broadinstitute.github.io/picard/'>https://broadinstitute.github.io/picard/</a>. CrosscheckFingerprints command used in this workflow.</li>" : "",
+            params.enable_fingerprintcheck ? "<li>Picard Toolkit. Broad Institute, GitHub Repository. <a href='https://broadinstitute.github.io/picard/'>https://broadinstitute.github.io/picard/</a>. CrosscheckFingerprints and ExtractFingerprint commands used in this workflow.</li>" : "",
+            params.enable_fingerprintcheck ? "<li>Danecek, P., Bonfield, J. K., Liddle, J., Marshall, J., Ohan, V., Pollard, M. O., Whitwham, A., Keane, T., McCarthy, S. A., Davies, R. M., & Li, H. (2021). Twelve years of SAMtools and BCFtools. GigaScience, 10(2), giab008. doi: <a href='https://doi.org/10.1093/gigascience/giab008'>10.1093/gigascience/giab008</a></li>" : "",
+            params.enable_fingerprintcheck && params.align_reads_for_fingerprint ? "<li>Vasimuddin, Md., Misra, S., Li, H., & Aluru, S. (2019). Efficient Architecture-Aware Acceleration of BWA-MEM for Multicore Systems. 2019 IEEE International Parallel and Distributed Processing Symposium (IPDPS), 314-324. doi: <a href='https://doi.org/10.1109/IPDPS.2019.00041'>10.1109/IPDPS.2019.00041</a></li>" : "",
             "<li>Ewels, P., Magnusson, M., Lundin, S., & Käller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. Bioinformatics , 32(19), 3047–3048. doi: /10.1093/bioinformatics/btw354</li>"
         ].findAll { entry -> entry }.join(' ').trim()
 
