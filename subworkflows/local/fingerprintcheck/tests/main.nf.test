@@ -1,0 +1,354 @@
+nextflow_workflow {
+
+    name "Test Subworkflow FINGERPRINTCHECK"
+    script "../main.nf"
+    workflow "FINGERPRINTCHECK"
+
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "fingerprintcheck"
+
+    // Synthetic fixtures, see tests/fixtures/fingerprint/make_fingerprint_fixtures.py.
+    // report/previous_database.vcf.gz is the fingerprint database of run A
+    // (SYN001_3-N = individual P1, SYN002_1-T = individual P2);
+    // report/database.vcf.gz is run A plus SYN001_3-N, SYN002_1-T, SYN003_1-T of run B.
+
+    test("run B against database of run A, SYN004_3-N aligned with bwa-mem2") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+            workflow {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                // sample -> has BAM; SYN001_3-N = P1 again, SYN003_1-T = P1, SYN002_1-T = P3, SYN004_3-N = P4
+                def samples = [ 'SYN001_3-N': true, 'SYN003_1-T': true, 'SYN002_1-T': true, 'SYN004_3-N': false ]
+                input[0] = channel.fromList(samples.collect { sample, has_bam ->
+                    [
+                        [ id: sample, single_end: false, runid: run_b, bam: has_bam ? file("\${fixtures}/\${sample}_\${run_b}.bam", checkIfExists: true) : [] ],
+                        [ file("\${fixtures}/\${sample}_\${run_b}_R1.fastq.gz", checkIfExists: true), file("\${fixtures}/\${sample}_\${run_b}_R2.fastq.gz", checkIfExists: true) ]
+                    ]
+                })
+                input[1] = "\${fixtures}/haplotype_map.txt"
+                input[2] = "\${fixtures}/reference.fasta"
+                input[3] = null
+                input[4] = null
+                input[5] = null
+                input[6] = true
+                input[7] = "\${fixtures}/report/previous_database.vcf.gz"
+                """
+            }
+        }
+
+        then {
+            def matches = path(workflow.out.database_matches[0][1]).readLines()
+            def database = file(workflow.out.database[0][1])
+            def database_samples = path(database.toString()).linesGzip.find { line -> line.startsWith('#CHROM') }.split('\t')[9..-1]
+            def database_crosscheck = path(workflow.out.database_crosscheck_metrics[0][1]).readLines()
+            def check = path(workflow.out.database_check[0][1]).readLines()
+            def fingerprints = path(workflow.out.database_fingerprints[0][1]).readLines()
+            // the summary names the timestamped database; drop that line for the snapshot
+            def summary = path(workflow.out.database_summary[0][1]).readLines().findAll { line -> !line.startsWith('updated_database_file') }
+            assertAll(
+                { assert workflow.success },
+                // the three cases of the fixture design, unexpected results first
+                { assert matches.collect { line -> line.split('\t')[[0, 1, 2, 3, 4]].join(' ') } == [
+                    'sample runid database_sample database_runid status',
+                    'SYN003_1-T 20260201_LH00001_0002_BFIXTURE02 SYN001_3-N 20260101_LH00001_0001_AFIXTURE01 UNEXPECTED_MATCH',
+                    'SYN002_1-T 20260201_LH00001_0002_BFIXTURE02 SYN002_1-T 20260101_LH00001_0001_AFIXTURE01 UNEXPECTED_MISMATCH',
+                    'SYN001_3-N 20260201_LH00001_0002_BFIXTURE02 SYN001_3-N 20260101_LH00001_0001_AFIXTURE01 EXPECTED_MATCH'
+                ] },
+                // the updated database carries the start time of the run in its name
+                { assert database.name ==~ /exomeqc_fingerprint_database_\d{8}-\d{6}\.vcf\.gz/ },
+                // updated database = all four samples of run B plus the database of run A
+                // (bcftools/merge orders its input files by name)
+                { assert database_samples == [
+                    'SYN001_3-N@20260201_LH00001_0002_BFIXTURE02',
+                    'SYN002_1-T@20260201_LH00001_0002_BFIXTURE02',
+                    'SYN003_1-T@20260201_LH00001_0002_BFIXTURE02',
+                    'SYN004_3-N@20260201_LH00001_0002_BFIXTURE02',
+                    'SYN001_3-N@20260101_LH00001_0001_AFIXTURE01',
+                    'SYN002_1-T@20260101_LH00001_0001_AFIXTURE01'
+                ] },
+                // run B was checked against run A only: 4 x 2 comparisons, none with itself
+                { assert database_crosscheck.findAll { line -> line.contains('\tSAMPLE\t') }.size() == 8 },
+                { assert database_crosscheck.findAll { line -> line.contains('\tSAMPLE\t') }.every { line -> line.split('\t')[1].endsWith('@20260101_LH00001_0001_AFIXTURE01') } },
+                // the database check: bgzip, both fingerprints kept
+                { assert check.contains('database_compression\tbgzip') },
+                { assert check.contains('kept_fingerprints\t2') },
+                // every sample of run B gave a suitable fingerprint
+                { assert fingerprints.size() == 5 },
+                { assert fingerprints[1..-1].every { line -> line.endsWith('\tSUITABLE') } },
+                // the cohort crosscheck covers all four BAMs, including the aligned one: 4 x 4 comparisons
+                { assert path(workflow.out.crosscheck_metrics[0][1]).readLines().findAll { line -> line.contains('\tFILE\t') }.size() == 16 },
+                { assert workflow.out.database_multiqc.collect { row -> file(row[1]).name }.sort() == [ 'fingerprint_database_matches_mqc.tsv', 'fingerprint_database_overview_mqc.html' ] },
+                { assert workflow.out.fingerprints.collect { row -> file(row[1]).name }.sort() == [
+                    'SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz',
+                    'SYN002_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz',
+                    'SYN003_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz',
+                    'SYN004_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz'
+                ] },
+                { assert snapshot(
+                    workflow.out.database_matches,
+                    workflow.out.database_fingerprints,
+                    workflow.out.database_check,
+                    summary,
+                    // genotype data of the fingerprints (header lines carry dates and paths)
+                    workflow.out.fingerprints.sort { row -> file(row[1]).name }.collect { row -> path(row[1]).linesGzip.findAll { line -> !line.startsWith('##') } }
+                ).match() }
+            )
+        }
+    }
+
+    test("run A without database") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+            workflow {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                def run_a = '20260101_LH00001_0001_AFIXTURE01'
+                input[0] = channel.fromList(['SYN001_3-N', 'SYN002_1-T'].collect { sample ->
+                    [
+                        [ id: sample, single_end: false, runid: run_a, bam: file("\${fixtures}/\${sample}_\${run_a}.bam", checkIfExists: true) ],
+                        [ file("\${fixtures}/\${sample}_\${run_a}_R1.fastq.gz", checkIfExists: true), file("\${fixtures}/\${sample}_\${run_a}_R2.fastq.gz", checkIfExists: true) ]
+                    ]
+                })
+                input[1] = "\${fixtures}/haplotype_map.txt"
+                input[2] = "\${fixtures}/reference.fasta"
+                input[3] = "\${fixtures}/reference.fasta.fai"
+                input[4] = "\${fixtures}/reference.dict"
+                input[5] = null
+                input[6] = false
+                input[7] = null
+                """
+            }
+        }
+
+        then {
+            def database_samples = path(workflow.out.database[0][1]).linesGzip.find { line -> line.startsWith('#CHROM') }.split('\t')[9..-1]
+            def matches_note = workflow.out.database_multiqc.find { row -> file(row[1]).name == 'fingerprint_database_matches_mqc.html' }
+            def summary = path(workflow.out.database_summary[0][1]).readLines().findAll { line -> !line.startsWith('updated_database_file') }
+            assertAll(
+                { assert workflow.success },
+                { assert database_samples == [ 'SYN001_3-N@20260101_LH00001_0001_AFIXTURE01', 'SYN002_1-T@20260101_LH00001_0001_AFIXTURE01' ] },
+                { assert path(workflow.out.database_matches[0][1]).readLines().size() == 1 },
+                { assert matches_note != null },
+                { assert path(matches_note[1]).text.contains('No fingerprint database of previous runs was given') },
+                // no check of and no crosscheck with a database
+                { assert workflow.out.database_check.size() == 0 },
+                { assert workflow.out.database_crosscheck_metrics.size() == 0 },
+                { assert snapshot(summary).match() }
+            )
+        }
+    }
+
+    test("plain VCF database without index, run B replaces its own fingerprints") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+            workflow {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                // database of run A and run B, uncompressed and without index
+                def database = file("${outputDir}/database_plain.vcf")
+                database.text = new java.util.zip.GZIPInputStream(file("\${fixtures}/report/database.vcf.gz").newInputStream()).text
+                input[0] = channel.fromList(['SYN001_3-N', 'SYN002_1-T', 'SYN003_1-T'].collect { sample ->
+                    [
+                        [ id: sample, single_end: false, runid: run_b, bam: file("\${fixtures}/\${sample}_\${run_b}.bam", checkIfExists: true) ],
+                        []
+                    ]
+                })
+                input[1] = "\${fixtures}/haplotype_map.txt"
+                input[2] = "\${fixtures}/reference.fasta"
+                input[3] = "\${fixtures}/reference.fasta.fai"
+                input[4] = "\${fixtures}/reference.dict"
+                input[5] = null
+                input[6] = false
+                input[7] = database.toString()
+                """
+            }
+        }
+
+        then {
+            def check = path(workflow.out.database_check[0][1]).readLines()
+            def database_samples = path(workflow.out.database[0][1]).linesGzip.find { line -> line.startsWith('#CHROM') }.split('\t')[9..-1]
+            def matches = path(workflow.out.database_matches[0][1]).readLines()
+            assertAll(
+                { assert workflow.success },
+                // plain VCF detected; the three fingerprints of run B are replaced, run A is kept
+                { assert check.contains('database_compression\tplain') },
+                { assert check.contains('replaced_fingerprints\t3') },
+                { assert check.contains('kept_fingerprints\t2') },
+                // the replaced fingerprints are not duplicated: 2 of run A + 3 new of run B
+                { assert database_samples == [
+                    'SYN001_3-N@20260201_LH00001_0002_BFIXTURE02',
+                    'SYN002_1-T@20260201_LH00001_0002_BFIXTURE02',
+                    'SYN003_1-T@20260201_LH00001_0002_BFIXTURE02',
+                    'SYN001_3-N@20260101_LH00001_0001_AFIXTURE01',
+                    'SYN002_1-T@20260101_LH00001_0001_AFIXTURE01'
+                ] },
+                // the new fingerprints are compared with run A only, not with their old copies
+                { assert matches.size() == 4 },
+                { assert matches[1..-1].every { line -> line.split('\t')[3] == '20260101_LH00001_0001_AFIXTURE01' } },
+                { assert path(workflow.out.database_summary[0][1]).readLines().contains('replaced_fingerprints\t3') },
+                { assert path(workflow.out.database_multiqc.find { row -> file(row[1]).name.contains('overview') }[1]).text.contains('dropped and replaced') }
+            )
+        }
+    }
+
+    test("database with only this run's fingerprints") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+            workflow {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                def run_a = '20260101_LH00001_0001_AFIXTURE01'
+                // run A analysed again against its own database
+                input[0] = channel.fromList(['SYN001_3-N', 'SYN002_1-T'].collect { sample ->
+                    [
+                        [ id: sample, single_end: false, runid: run_a, bam: file("\${fixtures}/\${sample}_\${run_a}.bam", checkIfExists: true) ],
+                        []
+                    ]
+                })
+                input[1] = "\${fixtures}/haplotype_map.txt"
+                input[2] = "\${fixtures}/reference.fasta"
+                input[3] = "\${fixtures}/reference.fasta.fai"
+                input[4] = "\${fixtures}/reference.dict"
+                input[5] = null
+                input[6] = false
+                input[7] = "\${fixtures}/report/previous_database.vcf.gz"
+                """
+            }
+        }
+
+        then {
+            def database_samples = path(workflow.out.database[0][1]).linesGzip.find { line -> line.startsWith('#CHROM') }.split('\t')[9..-1]
+            def matches_note = workflow.out.database_multiqc.find { row -> file(row[1]).name == 'fingerprint_database_matches_mqc.html' }
+            assertAll(
+                { assert workflow.success },
+                { assert path(workflow.out.database_check[0][1]).readLines().contains('kept_fingerprints\t0') },
+                // nothing left to compare with: no crosscheck against the database
+                { assert workflow.out.database_crosscheck_metrics.size() == 0 },
+                { assert database_samples == [ 'SYN001_3-N@20260101_LH00001_0001_AFIXTURE01', 'SYN002_1-T@20260101_LH00001_0001_AFIXTURE01' ] },
+                { assert path(matches_note[1]).text.contains('contained only fingerprints of this run') }
+            )
+        }
+    }
+
+    test("error - database of another reference") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+            workflow {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                // the database of run A with the contig named '1' instead of 'chr1'
+                def database = file("${outputDir}/other_reference.vcf")
+                database.text = new java.util.zip.GZIPInputStream(file("\${fixtures}/report/previous_database.vcf.gz").newInputStream()).text.readLines()
+                    .collect { line -> line.replace('##contig=<ID=chr1,', '##contig=<ID=1,').replaceFirst(/^chr1\\t/, '1\\t') }
+                    .join('\\n') + '\\n'
+                input[0] = channel.of([
+                    [ id: 'SYN001_3-N', single_end: false, runid: run_b, bam: file("\${fixtures}/SYN001_3-N_\${run_b}.bam", checkIfExists: true) ],
+                    []
+                ])
+                input[1] = "\${fixtures}/haplotype_map.txt"
+                input[2] = "\${fixtures}/reference.fasta"
+                input[3] = "\${fixtures}/reference.fasta.fai"
+                input[4] = "\${fixtures}/reference.dict"
+                input[5] = null
+                input[6] = false
+                input[7] = database.toString()
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.failed },
+                // the check stops the run before any comparison
+                { assert workflow.trace.failed().collect { task -> task.name }.any { name -> name.contains('CHECK_FINGERPRINT_DATABASE') } },
+                { assert (workflow.stdout + workflow.stderr).join('\n').contains("##contig '1' is not in the sequence dictionary of the haplotype map") }
+            )
+        }
+    }
+
+    test("error - sample without BAM and alignment off") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+            workflow {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                input[0] = channel.of([
+                    [ id: 'SYN004_3-N', single_end: false, runid: run_b, bam: [] ],
+                    [ file("\${fixtures}/SYN004_3-N_\${run_b}_R1.fastq.gz", checkIfExists: true), file("\${fixtures}/SYN004_3-N_\${run_b}_R2.fastq.gz", checkIfExists: true) ]
+                ])
+                input[1] = "\${fixtures}/haplotype_map.txt"
+                input[2] = "\${fixtures}/reference.fasta"
+                input[3] = "\${fixtures}/reference.fasta.fai"
+                input[4] = "\${fixtures}/reference.dict"
+                input[5] = null
+                input[6] = false
+                input[7] = null
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.failed },
+                { assert workflow.stdout.join('\n').contains("samplesheet row 'SYN004_3-N' (run 20260201_LH00001_0002_BFIXTURE02): column 'bam' is empty") }
+            )
+        }
+    }
+
+    test("error - empty runid") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+            workflow {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                def run_a = '20260101_LH00001_0001_AFIXTURE01'
+                input[0] = channel.of([
+                    [ id: 'SYN001_3-N', single_end: false, runid: [], bam: file("\${fixtures}/SYN001_3-N_\${run_a}.bam", checkIfExists: true) ],
+                    []
+                ])
+                input[1] = "\${fixtures}/haplotype_map.txt"
+                input[2] = "\${fixtures}/reference.fasta"
+                input[3] = "\${fixtures}/reference.fasta.fai"
+                input[4] = "\${fixtures}/reference.dict"
+                input[5] = null
+                input[6] = false
+                input[7] = null
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.failed },
+                { assert workflow.stdout.join('\n').contains("samplesheet row 'SYN001_3-N': column 'runid' is empty") }
+            )
+        }
+    }
+}

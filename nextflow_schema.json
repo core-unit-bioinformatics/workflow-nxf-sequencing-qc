@@ -58,25 +58,46 @@
             "title": "Fingerprint check options",
             "type": "object",
             "fa_icon": "fas fa-fingerprint",
-            "description": "Options for optional Picard CrosscheckFingerprints analysis.",
+            "description": "Options for the Picard fingerprint check of this run's samples and the fingerprint database of previous runs.",
             "properties": {
                 "enable_fingerprintcheck": {
                     "type": "boolean",
-                    "description": "Enable Picard CrosscheckFingerprints on normal/tumor BAMs from the samplesheet.",
-                    "help_text": "When enabled, each row in the input samplesheet must define `normal_bam` and `tumor_bam` columns.",
+                    "description": "Enable the fingerprint check (Picard CrosscheckFingerprints and the fingerprint database).",
+                    "help_text": "When enabled, every samplesheet row needs a `runid` and either a `bam` or, with `--align_reads_for_fingerprint`, FASTQ files. Requires `--fingerprint_haplotype_map` and `--fasta`.",
                     "default": true
                 },
                 "fingerprint_haplotype_map": {
                     "type": "string",
                     "format": "file-path",
                     "exists": true,
-                    "description": "Path to Picard/GATK haplotype map used by CrosscheckFingerprints.",
-                    "help_text": "Required when `--enable_fingerprintcheck` is set."
+                    "description": "Path to the Picard haplotype map (text format) used for the fingerprints.",
+                    "help_text": "Required when `--enable_fingerprintcheck` is set. Must be the text format with `@SQ` header lines (e.g. `Homo_sapiens_assembly38.haplotype_database.txt`); haplotype maps in VCF format are not supported. Use the same map for all runs of one fingerprint database."
                 },
                 "fingerprint_allow_duplicate_reads": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Allow duplicate reads in CrosscheckFingerprints."
+                    "description": "Allow duplicate reads in CrosscheckFingerprints of this run's BAMs (heatmap)."
+                },
+                "align_reads_for_fingerprint": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Align the FASTQ files of samples without BAM with bwa-mem2 for the fingerprint check.",
+                    "help_text": "Off by default. Without it, every samplesheet row needs a `bam`. The aligned BAMs are only used for fingerprinting and are not published. Uses `--bwamem2_index`, or builds the index from `--fasta` (slow and memory-intensive for a human genome)."
+                },
+                "fingerprint_database": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.vcf(\\.gz)?$",
+                    "description": "Fingerprint database of previous exomeqc runs (`fingerprintcheck/database/exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz`).",
+                    "help_text": "Optional. Plain VCF, gzip or bgzip; an index is not needed (a new one is made). Checked against `--fingerprint_haplotype_map` first; a database of another haplotype map or reference stops the run with an ERROR. WARNING: fingerprints with the same sample AND run ID (`<sample>@<runid>`) as a sample of this run are dropped and replaced by the new ones. This run is compared with the remaining fingerprints, then added to them; the result is written as the new database. The given file is not modified."
+                },
+                "fingerprint_database_lod_threshold": {
+                    "type": "number",
+                    "default": 5,
+                    "exclusiveMinimum": 0,
+                    "description": "LOD threshold T for comparisons with the fingerprint database: match if LOD >= T, mismatch if LOD <= -T, inconclusive in between.",
+                    "help_text": "A LOD of N means the two fingerprints are 10^N times more likely to come from the same individual than from different ones. Also used for the fingerprint of each sample: SUITABLE if its self LOD (the sample's BAM compared with itself) is >= T, else INSUFFICIENT."
                 }
             }
         },
@@ -163,10 +184,33 @@
                     "format": "file-path",
                     "exists": true,
                     "mimetype": "text/plain",
-                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
-                    "description": "Path to FASTA genome file.",
-                    "help_text": "This parameter is *mandatory* if `--genome` is not specified. If you don't have a BWA index available this will be generated for you automatically. Combine with `--save_reference` to save BWA index for future runs.",
+                    "pattern": "^\\S+\\.fn?a(sta)?$",
+                    "description": "Path to the reference FASTA the BAMs are aligned to.",
+                    "help_text": "Required with `--enable_fingerprintcheck` (Picard ExtractFingerprint). Must be uncompressed. Also used for the alignment with `--align_reads_for_fingerprint`.",
                     "fa_icon": "far fa-file-code"
+                },
+                "fasta_fai": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.fai$",
+                    "description": "Path to the samtools index (.fai) of `--fasta`. Created if not given.",
+                    "fa_icon": "far fa-file-code"
+                },
+                "fasta_dict": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.dict$",
+                    "description": "Path to the sequence dictionary (.dict) of `--fasta`. Created if not given.",
+                    "fa_icon": "far fa-file-code"
+                },
+                "bwamem2_index": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Path to the bwa-mem2 index directory of `--fasta` (used with `--align_reads_for_fingerprint`). Built if not given.",
+                    "fa_icon": "far fa-folder-open"
                 },
                 "igenomes_ignore": {
                     "type": "boolean",

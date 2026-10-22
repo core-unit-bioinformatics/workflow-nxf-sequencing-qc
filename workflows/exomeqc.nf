@@ -59,18 +59,31 @@ workflow EXOMEQC {
         if (!params.fingerprint_haplotype_map) {
             error("Please provide --fingerprint_haplotype_map when --enable_fingerprintcheck is set")
         }
-        if (!ch_samplesheet.first().map { meta, _reads -> meta.bam }) {
-            error("Fingerprint check requires samplesheet column 'bam' for all samples")
+        // Picard ExtractFingerprint requires the reference the BAMs are aligned to
+        if (!params.fasta) {
+            error("Please provide --fasta (the reference the BAMs are aligned to) when --enable_fingerprintcheck is set")
         }
+        // Rows without BAM, runid and FASTQs are validated per row in FINGERPRINTCHECK.
 
         FINGERPRINTCHECK(
             ch_samplesheet,
-            params.fingerprint_haplotype_map
+            params.fingerprint_haplotype_map,
+            params.fasta,
+            params.fasta_fai,
+            params.fasta_dict,
+            params.bwamem2_index,
+            params.align_reads_for_fingerprint,
+            params.fingerprint_database
         )
 
         // MultiQC expects plain file paths; fingerprintcheck outputs are tuple(meta, path).
+        // Only the crosscheck among this run's samples goes to MultiQC's Picard module
+        // (heatmap); the comparison with the database is reported as custom content.
         ch_multiqc_files       = ch_multiqc_files.mix(
             FINGERPRINTCHECK.out.crosscheck_metrics.map { _meta, crosscheck_metrics -> crosscheck_metrics }
+        )
+        ch_multiqc_files       = ch_multiqc_files.mix(
+            FINGERPRINTCHECK.out.database_multiqc.map { _meta, database_report -> database_report }
         )
     }
 

@@ -4,29 +4,53 @@
 The fixtures are fully synthetic: a random 20 kb reference contig, a Picard
 haplotype map with 100 bi-allelic SNPs, and simulated paired-end reads of four
 synthetic individuals (P1-P4) with known genotypes. They contain no real
-sequence or patient data. Samples are spread over two synthetic sequencing
-runs so that every case of the fingerprint database comparison is covered:
+sequence or patient data. Sample IDs (SYN001 ...) and run IDs (flow cell
+AFIXTURE01 / BFIXTURE02) are made up and do not follow the numbering of real
+cases. Samples are spread over two synthetic sequencing runs so that every
+case of the fingerprint database comparison is covered:
 
     run A (20260101_LH00001_0001_AFIXTURE01), used to build a database:
-        100-26_3-N  individual P1
-        200-26_1-T  individual P2
+        SYN001_3-N  individual P1
+        SYN002_1-T  individual P2
     run B (20260201_LH00001_0002_BFIXTURE02), checked against that database:
-        100-26_3-N  individual P1  same sample ID as in run A, same person
-        300-26_1-T  individual P1  other sample ID, same person as in run A
-        200-26_1-T  individual P3  same sample ID as in run A, other person
-        400-26_3-N  individual P4  no match; FASTQ only (alignment path)
+        SYN001_3-N  individual P1  same sample ID as in run A, same person
+        SYN003_1-T  individual P1  other sample ID, same person as in run A
+        SYN002_1-T  individual P3  same sample ID as in run A, other person
+        SYN004_3-N  individual P4  no match; FASTQ only (alignment path)
+
+With --report-fixtures, the inputs of the module tests are made from these
+data with Picard and bcftools (both must be on PATH) and written to report/
+and multiqc/, in the same way as the pipeline makes them:
+
+    report/<sample>_<run>.fingerprint.vcf.gz   ExtractFingerprint of the BAMs
+    report/previous_database.vcf.gz            database of run A
+    report/run_fingerprint_ids.txt             fingerprint IDs of run B
+    report/run_samples.tsv                     run B samples with BAM
+    report/crosscheck.crosscheck_metrics.txt   run B BAMs against each other
+    report/fingerprint_database.crosscheck_metrics.txt
+                                               run B against run A database
+    report/database.vcf.gz                     updated database (A + B)
+    multiqc/fingerprint_database.crosscheck_metrics.txt
+                                               copy for the pipeline test
+
+Paths, dates and command lines are removed from their headers, so that the
+fixtures do not depend on the machine they were made on.
 
 Requires pysam (only needed to regenerate the fixtures, not to run the
-pipeline). The output is deterministic for a given --seed.
+pipeline). The output is deterministic for a given --seed, apart from the
+compression of the gzipped files.
 
 Usage:
-    make_fingerprint_fixtures.py --outdir tests/fixtures/fingerprint
+    make_fingerprint_fixtures.py --outdir tests/fixtures/fingerprint [--report-fixtures]
 """
 
 import argparse
 import gzip
 import hashlib
 import random
+import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -42,15 +66,17 @@ COVERAGE = 25
 BASE_QUALITY = "F"  # Phred 37 in Sanger encoding
 RUN_A = "20260101_LH00001_0001_AFIXTURE01"
 RUN_B = "20260201_LH00001_0002_BFIXTURE02"
+LOD_THRESHOLD = 5
+FIXED_DATE = "20260101"
 
 # (run, sample, individual, write_bam) for every simulated sequencing sample
 SAMPLES = [
-    (RUN_A, "100-26_3-N", "P1", True),
-    (RUN_A, "200-26_1-T", "P2", True),
-    (RUN_B, "100-26_3-N", "P1", True),
-    (RUN_B, "300-26_1-T", "P1", True),
-    (RUN_B, "200-26_1-T", "P3", True),
-    (RUN_B, "400-26_3-N", "P4", False),
+    (RUN_A, "SYN001_3-N", "P1", True),
+    (RUN_A, "SYN002_1-T", "P2", True),
+    (RUN_B, "SYN001_3-N", "P1", True),
+    (RUN_B, "SYN003_1-T", "P1", True),
+    (RUN_B, "SYN002_1-T", "P3", True),
+    (RUN_B, "SYN004_3-N", "P4", False),
 ]
 INDIVIDUALS = ["P1", "P2", "P3", "P4"]
 
@@ -128,7 +154,7 @@ def haplotype_sequence(sequence, snps, haplotype):
     return "".join(bases)
 
 
-def simulate_sample(outdir, run, sample, haplotypes, write_bam, rng, dict_lines):
+def simulate_sample(outdir, run, sample, haplotypes, write_bam, rng):
     """Simulate error-free read pairs of one sample, write FASTQ (and BAM)."""
     prefix = f"{sample}_{run}"
     n_pairs = CONTIG_LENGTH * COVERAGE // (2 * READ_LENGTH)
@@ -143,14 +169,17 @@ def simulate_sample(outdir, run, sample, haplotypes, write_bam, rng, dict_lines)
         reverse = haplotype[mate_start : mate_start + READ_LENGTH]
         pairs.append((f"{prefix}:{pair_index}", start, forward, mate_start, reverse))
 
-    # write R1 (forward strand) and R2 (reverse strand) FASTQ files
-    with gzip.open(outdir / f"{prefix}_R1.fastq.gz", "wt") as r1, gzip.open(
-        outdir / f"{prefix}_R2.fastq.gz", "wt"
-    ) as r2:
+    # write R1 (forward strand) and R2 (reverse strand) FASTQ files; mtime=0
+    # keeps the gzip header free of the creation time
+    with gzip.GzipFile(
+        outdir / f"{prefix}_R1.fastq.gz", "wb", mtime=0
+    ) as r1, gzip.GzipFile(outdir / f"{prefix}_R2.fastq.gz", "wb", mtime=0) as r2:
         for name, _start, forward, _mate_start, reverse in pairs:
-            r1.write(f"@{name}/1\n{forward}\n+\n{BASE_QUALITY * READ_LENGTH}\n")
+            r1.write(
+                f"@{name}/1\n{forward}\n+\n{BASE_QUALITY * READ_LENGTH}\n".encode()
+            )
             r2.write(
-                f"@{name}/2\n{reverse_complement(reverse)}\n+\n{BASE_QUALITY * READ_LENGTH}\n"
+                f"@{name}/2\n{reverse_complement(reverse)}\n+\n{BASE_QUALITY * READ_LENGTH}\n".encode()
             )
 
     if not write_bam:
@@ -182,9 +211,10 @@ def simulate_sample(outdir, run, sample, haplotypes, write_bam, rng, dict_lines)
                 read.template_length = INSERT_SIZE if is_read1 else -INSERT_SIZE
                 read.set_tag("RG", prefix)
                 bam.write(read)
-    # coordinate-sort and index the BAM, then remove the unsorted file
+    # coordinate-sort without a @PG line (it would record the local command
+    # line), index the BAM, then remove the unsorted file
     sorted_bam = outdir / f"{prefix}.bam"
-    pysam.sort("-o", str(sorted_bam), str(unsorted_bam))
+    pysam.sort("--no-PG", "-o", str(sorted_bam), str(unsorted_bam))
     pysam.index(str(sorted_bam))
     unsorted_bam.unlink()
 
@@ -200,12 +230,224 @@ def write_genotype_table(outdir, snps, genotypes):
     (outdir / "true_genotypes.tsv").write_text("\n".join(lines) + "\n")
 
 
+def run(command, cwd):
+    """Run a tool in cwd, stop with an ERROR if it fails."""
+    print(f"INFO: running {' '.join(command)}", file=sys.stderr)
+    result = subprocess.run(
+        command, cwd=cwd, capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0:
+        print(result.stderr, file=sys.stderr)
+        sys.exit(f"ERROR: {command[0]} failed with exit status {result.returncode}")
+
+
+def sanitize_text(text, workdir):
+    """Remove local paths, dates and command lines from a tool output header."""
+    # absolute paths of the working directory become relative names
+    text = text.replace(f"file://{workdir}/", "").replace(f"{workdir}/", "")
+    lines = []
+    for line in text.splitlines():
+        # bcftools records its command line and the date
+        if re.match(r"##bcftools_\w+Command=", line):
+            continue
+        if line.startswith("##fileDate="):
+            line = f"##fileDate={FIXED_DATE}"
+        # Picard writes the absolute reference path
+        if line.startswith("##reference="):
+            line = "##reference=reference.fasta"
+        # Picard metrics: the command line and the start time
+        if line.startswith("# CrosscheckFingerprints"):
+            line = "# CrosscheckFingerprints (command line removed)"
+        if line.startswith("# Started on:"):
+            line = f"# Started on: {FIXED_DATE}"
+        lines.append(line)
+    return "\n".join(lines) + "\n"
+
+
+def sanitize_vcf(path, workdir):
+    """Sanitize the header of a bgzipped VCF, then bgzip and index it again."""
+    with gzip.open(path, "rt") as handle:
+        text = sanitize_text(handle.read(), workdir)
+    plain = path.with_suffix("")
+    plain.write_text(text)
+    path.unlink()
+    for index in (Path(f"{path}.tbi"), Path(f"{path}.csi")):
+        if index.exists():
+            index.unlink()
+    # bgzip compress and tabix index with pysam
+    pysam.tabix_compress(str(plain), str(path), force=True)
+    pysam.tabix_index(str(path), preset="vcf", force=True)
+    plain.unlink()
+
+
+def make_report_fixtures(outdir):
+    """Make the module test inputs with Picard and bcftools from the simulated data."""
+    for tool in ("picard", "bcftools"):
+        if shutil.which(tool) is None:
+            sys.exit(f"ERROR: --report-fixtures needs '{tool}' on PATH")
+    report = outdir / "report"
+    report.mkdir(exist_ok=True)
+    workdir = report.resolve()
+    # stage the reference and the haplotype map next to the outputs
+    for name in (
+        "reference.fasta",
+        "reference.fasta.fai",
+        "reference.dict",
+        "haplotype_map.txt",
+    ):
+        shutil.copy(outdir / name, report / name)
+    for run_id, sample, _individual, write_bam in SAMPLES:
+        prefix = f"{sample}_{run_id}"
+        if write_bam:
+            shutil.copy(outdir / f"{prefix}.bam", report / f"{prefix}.bam")
+            shutil.copy(outdir / f"{prefix}.bam.bai", report / f"{prefix}.bam.bai")
+
+    bam_samples = [(r, s) for r, s, _i, has_bam in SAMPLES if has_bam]
+    # one fingerprint per BAM, sample name <sample>@<runid>
+    for run_id, sample in bam_samples:
+        prefix = f"{sample}_{run_id}"
+        run(
+            [
+                "picard",
+                "ExtractFingerprint",
+                "--INPUT",
+                f"{prefix}.bam",
+                "--HAPLOTYPE_MAP",
+                "haplotype_map.txt",
+                "--REFERENCE_SEQUENCE",
+                "reference.fasta",
+                "--SAMPLE_ALIAS",
+                f"{sample}@{run_id}",
+                "--CREATE_INDEX",
+                "true",
+                "--OUTPUT",
+                f"{prefix}.fingerprint.vcf.gz",
+            ],
+            report,
+        )
+        sanitize_vcf(report / f"{prefix}.fingerprint.vcf.gz", workdir)
+
+    run_a = [f"{s}_{r}.fingerprint.vcf.gz" for r, s in bam_samples if r == RUN_A]
+    run_b = [(r, s) for r, s in bam_samples if r == RUN_B]
+    run_b_vcfs = [f"{s}_{r}.fingerprint.vcf.gz" for r, s in run_b]
+    # database of run A
+    run(
+        [
+            "bcftools",
+            "merge",
+            "--output-type",
+            "z",
+            "--write-index=tbi",
+            "-o",
+            "previous_database.vcf.gz",
+        ]
+        + run_a,
+        report,
+    )
+    sanitize_vcf(report / "previous_database.vcf.gz", workdir)
+    # crosscheck of the BAMs of run B against each other (heatmap input)
+    run(
+        ["picard", "CrosscheckFingerprints"]
+        + [arg for r, s in run_b for arg in ("--INPUT", f"{s}_{r}.bam")]
+        + [
+            "--HAPLOTYPE_MAP",
+            "haplotype_map.txt",
+            "--CROSSCHECK_BY",
+            "FILE",
+            "--CALCULATE_TUMOR_AWARE_RESULTS",
+            "true",
+            "--ALLOW_DUPLICATE_READS",
+            "true",
+            "--EXIT_CODE_WHEN_MISMATCH",
+            "0",
+            "--OUTPUT",
+            "crosscheck.crosscheck_metrics.txt",
+        ],
+        report,
+    )
+    # crosscheck of run B's fingerprints against the database of run A
+    run(
+        ["picard", "CrosscheckFingerprints"]
+        + [arg for vcf in run_b_vcfs for arg in ("--INPUT", vcf)]
+        + [
+            "--SECOND_INPUT",
+            "previous_database.vcf.gz",
+            "--HAPLOTYPE_MAP",
+            "haplotype_map.txt",
+            "--CROSSCHECK_BY",
+            "SAMPLE",
+            "--CROSSCHECK_MODE",
+            "CHECK_ALL_OTHERS",
+            "--LOD_THRESHOLD",
+            str(LOD_THRESHOLD),
+            "--EXIT_CODE_WHEN_MISMATCH",
+            "0",
+            "--OUTPUT",
+            "fingerprint_database.crosscheck_metrics.txt",
+        ],
+        report,
+    )
+    for name in (
+        "crosscheck.crosscheck_metrics.txt",
+        "fingerprint_database.crosscheck_metrics.txt",
+    ):
+        metrics = report / name
+        metrics.write_text(sanitize_text(metrics.read_text(), workdir))
+    # updated database: run B fingerprints plus the database of run A
+    run(
+        [
+            "bcftools",
+            "merge",
+            "--output-type",
+            "z",
+            "--write-index=tbi",
+            "-o",
+            "database.vcf.gz",
+        ]
+        + run_b_vcfs
+        + ["previous_database.vcf.gz"],
+        report,
+    )
+    sanitize_vcf(report / "database.vcf.gz", workdir)
+
+    # run B samples with BAM, as the subworkflow lists them for the report
+    lines = ["fingerprint_id\tsample\trunid\tbam"]
+    lines += [
+        f"{s}@{r}\t{s}\t{r}\t{s}_{r}.bam" for r, s in sorted(run_b, key=lambda x: x[1])
+    ]
+    (report / "run_samples.tsv").write_text("\n".join(lines) + "\n")
+    (report / "run_fingerprint_ids.txt").write_text(
+        "".join(f"{s}@{r}\n" for r, s in sorted(run_b, key=lambda x: x[1]))
+    )
+
+    # remove the staged inputs again; they are kept one level up
+    for path in list(report.iterdir()):
+        if (
+            path.name.endswith((".bam", ".bai", ".fasta", ".fai", ".dict"))
+            or path.name == "haplotype_map.txt"
+        ):
+            path.unlink()
+    # MultiQC input directory of the pipeline test: only the database crosscheck,
+    # which MultiQC must keep out of the Picard heatmap
+    multiqc = outdir / "multiqc"
+    multiqc.mkdir(exist_ok=True)
+    shutil.copy(
+        report / "fingerprint_database.crosscheck_metrics.txt",
+        multiqc / "fingerprint_database.crosscheck_metrics.txt",
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--outdir", required=True, type=Path, help="output directory")
     parser.add_argument("--seed", type=int, default=20261022, help="random seed")
+    parser.add_argument(
+        "--report-fixtures",
+        action="store_true",
+        help="also make the module test inputs (needs picard and bcftools on PATH)",
+    )
     args = parser.parse_args()
 
     args.outdir.mkdir(parents=True, exist_ok=True)
@@ -214,16 +456,18 @@ def main():
     snps = write_haplotype_map(args.outdir, sequence, dict_lines, rng)
     genotypes = draw_genotypes(snps, rng)
     write_genotype_table(args.outdir, snps, genotypes)
-    for run, sample, individual, write_bam in SAMPLES:
+    for run_id, sample, individual, write_bam in SAMPLES:
         # build both haplotype sequences of the individual this sample comes from
         haplotypes = [
             haplotype_sequence(sequence, snps, genotypes[individual][h])
             for h in range(2)
         ]
-        simulate_sample(
-            args.outdir, run, sample, haplotypes, write_bam, rng, dict_lines
+        simulate_sample(args.outdir, run_id, sample, haplotypes, write_bam, rng)
+        print(
+            f"INFO: simulated {sample} ({individual}) of run {run_id}", file=sys.stderr
         )
-        print(f"INFO: simulated {sample} ({individual}) of run {run}", file=sys.stderr)
+    if args.report_fixtures:
+        make_report_fixtures(args.outdir)
 
 
 if __name__ == "__main__":

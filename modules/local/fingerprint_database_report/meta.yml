@@ -1,9 +1,13 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
 name: "fingerprint_database_report"
 description: |
-  Classify the Picard CrosscheckFingerprints comparisons of this run's
-  fingerprints with the fingerprint database and report matches with samples
-  of other sequencing runs as a table and a MultiQC custom content section.
+  Report the fingerprint check of this run: an overview (haplotype map,
+  database checked, replaced fingerprints, comparison counts, updated
+  database), the fingerprint of each sample (haplotype blocks with reads, self
+  LOD, SUITABLE / INSUFFICIENT / NO_COVERAGE) and the comparisons with
+  fingerprints of other sequencing runs classified by LOD score, as tables and
+  MultiQC custom content. Reads VCFs with PyVCF and checks every input for
+  consistency.
 keywords:
   - fingerprint
   - crosscheck
@@ -11,7 +15,7 @@ keywords:
   - qc
 tools:
   - "fingerprint_database_report.py":
-      description: "exomeqc script (bin/) that classifies fingerprint comparisons with other runs by LOD score"
+      description: "exomeqc script (bin/) that summarises the fingerprint check and classifies comparisons with other runs by LOD score"
       homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
       licence: ["MIT"]
       identifier: ""
@@ -19,22 +23,38 @@ input:
   - - meta:
         type: map
         description: Run-level metadata map, e.g. `[ id:'fingerprint_database' ]`
-    - crosscheck_metrics:
-        type: file
-        description: CrosscheckFingerprints metrics of this run's fingerprints (INPUT) vs the updated database (SECOND_INPUT), CROSSCHECK_BY SAMPLE, CROSSCHECK_MODE CHECK_ALL_OTHERS
-        pattern: "*.crosscheck_metrics.txt"
     - run_samples:
         type: file
-        description: TSV with the columns fingerprint_id, sample, runid for every sample of this run
+        description: TSV with the columns fingerprint_id, sample, runid, bam (BAM file name) for every sample of this run
         pattern: "*.tsv"
+    - fingerprints:
+        type: file
+        description: Fingerprint VCFs of this run (Picard ExtractFingerprint), staged as `fingerprints/*`
+        pattern: "*.vcf.gz"
+    - haplotype_map:
+        type: file
+        description: Picard haplotype map (text format)
+        pattern: "*.txt"
+    - run_crosscheck:
+        type: file
+        description: CrosscheckFingerprints metrics of this run's BAMs against each other (CROSSCHECK_BY FILE), for the self LOD of each sample
+        pattern: "*.crosscheck_metrics.txt"
     - database:
         type: file
-        description: Updated fingerprint database (multi-sample VCF)
+        description: Updated fingerprint database (multi-sample VCF); only its header is read
         pattern: "*.vcf.gz"
-    - previous_database:
+    - database_check:
         type: file
-        description: Fingerprint database given to this run (optional, `[]` if none); staged as `previous/*`
-        pattern: "*.vcf.gz"
+        description: Check result of the given database (metric, value) from CHECK_FINGERPRINT_DATABASE; `[]` without a database
+        pattern: "*_check.tsv"
+    - database_samples:
+        type: file
+        description: Fingerprints of the given database with action keep or replace, from CHECK_FINGERPRINT_DATABASE; `[]` without a database
+        pattern: "*_samples.tsv"
+    - database_crosscheck:
+        type: file
+        description: CrosscheckFingerprints metrics of this run (INPUT) against the kept database fingerprints (SECOND_INPUT), CROSSCHECK_BY SAMPLE; `[]` if no fingerprint was kept
+        pattern: "*.crosscheck_metrics.txt"
 output:
   matches:
     - - meta:
@@ -44,14 +64,30 @@ output:
           type: file
           description: Reported comparisons with other runs (sample, runid, database_sample, database_runid, status, LOD scores)
           pattern: "*_matches.tsv"
+  fingerprints:
+    - - meta:
+          type: map
+          description: Run-level metadata map
+      - "*_fingerprints.tsv":
+          type: file
+          description: Fingerprint of each sample of this run (haplotype blocks with reads, mean depth, self LOD, status)
+          pattern: "*_fingerprints.tsv"
   summary:
     - - meta:
           type: map
           description: Run-level metadata map
       - "*_summary.tsv":
           type: file
-          description: Counts of samples, comparisons and classes (metric, value)
+          description: Counts of samples, fingerprints, comparisons and classes (metric, value)
           pattern: "*_summary.tsv"
+  overview:
+    - - meta:
+          type: map
+          description: Run-level metadata map
+      - "*_overview_mqc.html":
+          type: file
+          description: MultiQC custom content section "Fingerprint check: overview"
+          pattern: "*_overview_mqc.html"
   multiqc:
     - - meta:
           type: map
@@ -70,6 +106,16 @@ output:
       - python3 --version | sed 's/Python //':
           type: eval
           description: The expression to obtain the version of the tool
+  versions_pyvcf3:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - pyvcf3:
+          type: string
+          description: The name of the tool
+      - python3 -c 'import vcf; print(vcf.VERSION)':
+          type: eval
+          description: The expression to obtain the version of the tool
 topics:
   versions:
     - - ${task.process}:
@@ -79,6 +125,15 @@ topics:
           type: string
           description: The name of the tool
       - python3 --version | sed 's/Python //':
+          type: eval
+          description: The expression to obtain the version of the tool
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - pyvcf3:
+          type: string
+          description: The name of the tool
+      - python3 -c 'import vcf; print(vcf.VERSION)':
           type: eval
           description: The expression to obtain the version of the tool
 authors:

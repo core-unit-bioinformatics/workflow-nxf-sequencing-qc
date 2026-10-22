@@ -1,60 +1,96 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/subworkflows/yaml-schema.json
 name: "fingerprintcheck"
 description: |
-  Index input BAMs with samtools, run Picard CrosscheckFingerprints across all
-  normal/tumor pairs from the samplesheet, and visualise the resulting LOD-score
-  matrices as PNG heatmaps and a combined PDF report.
+  Sample identity check with Picard fingerprints. Crosschecks the BAMs of all
+  samples of this run with each other (heatmap in MultiQC). Extracts one
+  fingerprint per sample (<sample>@<runid>). If a fingerprint database of
+  previous runs is given, checks it against the haplotype map, drops the
+  fingerprints this run replaces (same <sample>@<runid>), converts it to bgzip
+  with index and crosschecks this run against it; then appends this run's
+  fingerprints: the updated database exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz.
+  Reports the check (overview, fingerprint of each sample, matches with other
+  runs) as tables and MultiQC custom content. Samples without BAM can be
+  aligned with bwa-mem2.
 keywords:
   - crosscheck
   - fingerprint
+  - sample identity
   - qc
-  - heatmap
 components:
+  - samtools/faidx
+  - picard/createsequencedictionary
+  - bwamem2/index
+  - bwamem2/mem
   - samtools/index
   - picard/crosscheckfingerprints
-  - fingerprintcheck/visualize
+  - picard/extractfingerprint
+  - bcftools/view
+  - bcftools/merge
+  - check_fingerprint_database
+  - fingerprint_database_report
 input:
-  - - meta:
-        type: map
-        description: |
-          Groovy Map with samplesheet-level metadata.
-          e.g. `[ id:'sample1', normal_bam:'/path/to/normal.bam', tumor_bam:'/path/to/tumor.bam' ]`
-    - fastqs:
-        type: list
-        description: List of FastQ paths (passed through, not consumed by this subworkflow)
+  - ch_samplesheet:
+      type: channel
+      description: |
+        Samplesheet rows `[ meta, [ fastq ] ]`; meta has `id`, `single_end`,
+        `bam` (BAM/CRAM or empty) and `runid`.
   - haplotype_map:
       type: file
-      description: Picard haplotype map file used by CrosscheckFingerprints
-      pattern: "*.{txt,vcf,vcf.gz}"
+      description: Picard haplotype map in text format
+      pattern: "*.txt"
+  - fasta:
+      type: file
+      description: Reference FASTA the BAMs are aligned to (uncompressed)
+      pattern: "*.{fa,fasta,fna}"
+  - fasta_fai:
+      type: file
+      description: FASTA index, or null to create it with samtools faidx
+      pattern: "*.fai"
+  - fasta_dict:
+      type: file
+      description: Sequence dictionary, or null to create it with Picard
+      pattern: "*.dict"
+  - bwamem2_index:
+      type: directory
+      description: bwa-mem2 index directory, or null to build it from fasta
+  - align_reads:
+      type: boolean
+      description: Align samples without BAM with bwa-mem2
+  - fingerprint_database:
+      type: file
+      description: Fingerprint database of previous runs (VCF, plain, gzip or bgzip; index not needed), or null
+      pattern: "*.{vcf,vcf.gz}"
 output:
-  crosscheck_metrics:
-    - - meta:
-          type: map
-          description: Run-level metadata map `[ id:'fingerprintcheck' ]`
-      - "*.crosscheck_metrics.txt":
-          type: file
-          description: Picard CrosscheckFingerprints metrics file
-          pattern: "*.crosscheck_metrics.txt"
-  plots:
-    - - meta:
-          type: map
-          description: Run-level metadata map `[ id:'fingerprintcheck' ]`
-      - "*.png":
-          type: file
-          description: LOD-score heatmap PNGs
-          pattern: "*.png"
-  report:
-    - - meta:
-          type: map
-          description: Run-level metadata map `[ id:'fingerprintcheck' ]`
-      - "*.pdf":
-          type: file
-          description: Combined PDF report containing all heatmaps
-          pattern: "*.pdf"
-  versions:
-    - versions.yml:
-        type: file
-        description: Software versions YAML
-        pattern: "versions.yml"
+  - crosscheck_metrics:
+      type: channel
+      description: "`[ meta, crosscheck.crosscheck_metrics.txt ]`: this run's BAMs against each other"
+  - fingerprints:
+      type: channel
+      description: "`[ meta, vcf.gz, tbi ]`: fingerprint of each sample"
+  - database:
+      type: channel
+      description: "`[ meta, vcf.gz, tbi ]`: updated database exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz"
+  - database_check:
+      type: channel
+      description: "`[ meta, previous_database_check.tsv ]`: check of the given database (only with a database)"
+  - database_crosscheck_metrics:
+      type: channel
+      description: "`[ meta, fingerprint_database.crosscheck_metrics.txt ]`: this run against the kept database fingerprints (only if fingerprints were kept)"
+  - database_matches:
+      type: channel
+      description: "`[ meta, fingerprint_database_matches.tsv ]`: reported comparisons with other runs"
+  - database_fingerprints:
+      type: channel
+      description: "`[ meta, fingerprint_database_fingerprints.tsv ]`: coverage, self LOD and status of each fingerprint of this run"
+  - database_summary:
+      type: channel
+      description: "`[ meta, fingerprint_database_summary.tsv ]`: counts (metric, value)"
+  - database_multiqc:
+      type: channel
+      description: "`[ meta, file ]`: MultiQC custom content (overview HTML, matches table or note)"
+  - versions:
+      type: channel
+      description: Empty; versions are collected via the `versions` topic
 authors:
   - "@kai"
 maintainers:

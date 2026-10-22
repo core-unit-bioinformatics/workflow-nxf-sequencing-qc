@@ -1,0 +1,138 @@
+{
+    "database of run A, checked by run B": {
+        "content": [
+            [
+                [
+                    {
+                        "id": "previous_database"
+                    },
+                    "previous_database_samples.tsv:md5,2167150c70b258bd6b9c02072494abc1"
+                ]
+            ],
+            [
+                [
+                    {
+                        "id": "previous_database"
+                    },
+                    "previous_database_keep.txt:md5,d35dc3e3cca0d258e150997b6d12c8e4"
+                ]
+            ],
+            [
+                [
+                    {
+                        "id": "previous_database"
+                    },
+                    "previous_database_check.tsv:md5,00b5156e7d049ef3f7590b389d56f57e"
+                ]
+            ],
+            {
+                "versions_python": [
+                    [
+                        "CHECK_FINGERPRINT_DATABASE",
+                        "python",
+                        "3.12.15"
+                    ]
+                ],
+                "versions_pyvcf3": [
+                    [
+                        "CHECK_FINGERPRINT_DATABASE",
+                        "pyvcf3",
+                        "1.0.4"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-10-23T17:22:07.695064489",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "database of run A - stub": {
+        "content": [
+            {
+                "0": [
+                    [
+                        {
+                            "id": "previous_database"
+                        },
+                        "previous_database_samples.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "1": [
+                    [
+                        {
+                            "id": "previous_database"
+                        },
+                        "previous_database_keep.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "2": [
+                    [
+                        {
+                            "id": "previous_database"
+                        },
+                        "previous_database_check.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "3": [
+                    [
+                        "CHECK_FINGERPRINT_DATABASE",
+                        "python",
+                        "3.12.15"
+                    ]
+                ],
+                "4": [
+                    [
+                        "CHECK_FINGERPRINT_DATABASE",
+                        "pyvcf3",
+                        "1.0.4"
+                    ]
+                ],
+                "check": [
+                    [
+                        {
+                            "id": "previous_database"
+                        },
+                        "previous_database_check.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "keep": [
+                    [
+                        {
+                            "id": "previous_database"
+                        },
+                        "previous_database_keep.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "samples": [
+                    [
+                        {
+                            "id": "previous_database"
+                        },
+                        "previous_database_samples.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "versions_python": [
+                    [
+                        "CHECK_FINGERPRINT_DATABASE",
+                        "python",
+                        "3.12.15"
+                    ]
+                ],
+                "versions_pyvcf3": [
+                    [
+                        "CHECK_FINGERPRINT_DATABASE",
+                        "pyvcf3",
+                        "1.0.4"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-10-23T17:24:33.573096781",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}

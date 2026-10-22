@@ -1,0 +1,104 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "check_fingerprint_database"
+description: |
+  Check a fingerprint database (plain, gzip or bgzip VCF) against the Picard
+  haplotype map of this run: fingerprint IDs, contigs and lengths, one SNP of
+  the map with the map's alleles per haplotype block, all blocks present, PL
+  values. Stops with an ERROR on any mismatch. Lists which fingerprints are
+  kept and which are replaced by this run (same sample and run ID).
+keywords:
+  - fingerprint
+  - haplotype map
+  - vcf
+  - qc
+tools:
+  - "check_fingerprint_database.py":
+      description: "exomeqc script (bin/) that checks a fingerprint database against the haplotype map with PyVCF"
+      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
+      licence: ["MIT"]
+      identifier: ""
+input:
+  - - meta:
+        type: map
+        description: Database metadata map, e.g. `[ id:'previous_database' ]`
+    - database:
+        type: file
+        description: Fingerprint database of previous runs (multi-sample VCF, plain, gzip or bgzip; no index needed)
+        pattern: "*.{vcf,vcf.gz}"
+  - haplotype_map:
+      type: file
+      description: Picard haplotype map (text format) of this run
+      pattern: "*.txt"
+  - run_fingerprint_ids:
+      type: file
+      description: Fingerprint IDs (<sample>@<runid>) of this run, one per line
+      pattern: "*.txt"
+output:
+  samples:
+    - - meta:
+          type: map
+          description: Database metadata map
+      - "*_samples.tsv":
+          type: file
+          description: Every fingerprint of the database (fingerprint_id, sample, runid, action keep or replace)
+          pattern: "*_samples.tsv"
+  keep:
+    - - meta:
+          type: map
+          description: Database metadata map
+      - "*_keep.txt":
+          type: file
+          description: IDs of the kept fingerprints, one per line (for bcftools view --samples-file); empty if none is kept
+          pattern: "*_keep.txt"
+  check:
+    - - meta:
+          type: map
+          description: Database metadata map
+      - "*_check.tsv":
+          type: file
+          description: Check results and counts (metric, value)
+          pattern: "*_check.tsv"
+  versions_python:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - python:
+          type: string
+          description: The name of the tool
+      - python3 --version | sed 's/Python //':
+          type: eval
+          description: The expression to obtain the version of the tool
+  versions_pyvcf3:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - pyvcf3:
+          type: string
+          description: The name of the tool
+      - python3 -c 'import vcf; print(vcf.VERSION)':
+          type: eval
+          description: The expression to obtain the version of the tool
+topics:
+  versions:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - python:
+          type: string
+          description: The name of the tool
+      - python3 --version | sed 's/Python //':
+          type: eval
+          description: The expression to obtain the version of the tool
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - pyvcf3:
+          type: string
+          description: The name of the tool
+      - python3 -c 'import vcf; print(vcf.VERSION)':
+          type: eval
+          description: The expression to obtain the version of the tool
+authors:
+  - "@kai"
+maintainers:
+  - "@kai"

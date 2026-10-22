@@ -12,12 +12,58 @@ The directories listed below will be created in the results directory after the 
 
 The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes data using the following steps:
 
-
+- [Fingerprint check](#fingerprint-check) - Sample identity checks within the run and against the fingerprint database of previous runs
 - [FastQ Screen](#fastq-screen) - Read-level contamination screening against multiple reference genomes
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
 
+### Fingerprint check
 
+<details markdown="1">
+<summary>Output files</summary>
+
+- `fingerprintcheck/`
+  - `crosscheck.crosscheck_metrics.txt`: Picard CrosscheckFingerprints of all BAMs of this run against each other; shown as table and heatmap in MultiQC.
+  - `fingerprints/<sample>_<runid>.fingerprint.vcf.gz` (+ `.tbi`): fingerprint of each sample (Picard ExtractFingerprint), VCF sample name `<sample>@<runid>`, FORMAT fields `AD`, `DP`, `PL` at the haplotype map SNPs.
+  - `database/`
+    - `exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` (+ `.tbi`): updated fingerprint database, named with the start time of the pipeline run: the kept fingerprints of the given `--fingerprint_database` (all except those replaced by this run, see the warning in [usage](usage.md#updated-fingerprint-database)) and all fingerprints of this run; the sample order follows the input file names of bcftools merge. Use it as `--fingerprint_database` of the next run.
+    - `previous_database_check.tsv` (only with `--fingerprint_database`): result of the check of the given database against the haplotype map (`metric`, `value`): `database_file`, `database_compression` (`plain`, `gzip` or `bgzip`), `database_samples`, `database_runs`, `database_sites`, `database_missing_genotypes`, `haplotype_map_snps`, `haplotype_map_blocks`, `replaced_fingerprints`, `kept_fingerprints`.
+    - `previous_database_samples.tsv` (only with `--fingerprint_database`): every fingerprint of the given database: `fingerprint_id`, `sample`, `runid`, `action` (`keep`, or `replace` when this run has a fingerprint with the same `<sample>@<runid>`).
+    - `fingerprint_database.crosscheck_metrics.txt` (only when the given database has kept fingerprints): Picard CrosscheckFingerprints of this run's fingerprints against the kept database fingerprints, before this run was added (all pairs). Not read by MultiQC's Picard module.
+    - `fingerprint_database_fingerprints.tsv`: fingerprint of each sample of this run (see below).
+    - `fingerprint_database_matches.tsv`: reported comparisons with fingerprints of other runs (see below).
+    - `fingerprint_database_summary.tsv`: counts (`metric`, `value`): `lod_threshold`, `haplotype_map_file`, `haplotype_map_snps`, `haplotype_map_blocks`, `run_samples`, `run_samples_suitable`, `run_samples_insufficient`, `run_samples_no_coverage`, `database_given` (`yes`/`no`), `database_file`, `database_compression`, `previous_database_samples`, `replaced_fingerprints`, `checked_database_samples`, `checked_database_runs`, `updated_database_file`, `database_samples` (in the updated database), `comparisons`, `unexpected_match`, `unexpected_mismatch`, `expected_match`, `inconclusive_same_sample`, `inconclusive_other_sample`, `expected_mismatch`, `reported_comparisons`.
+    - `fingerprint_database_overview_mqc.html`: MultiQC section "Fingerprint check: overview".
+    - `fingerprint_database_matches_mqc.tsv` or, when nothing is reported, `fingerprint_database_matches_mqc.html`: MultiQC section "Crosscheck Fingerprints: Database matches".
+
+</details>
+
+Columns of `fingerprint_database_matches.tsv`:
+
+| Column                   | Description                                                                                         |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| `sample`, `runid`        | Sample of this run                                                                                  |
+| `database_sample`        | Sample ID of the database fingerprint                                                               |
+| `database_runid`         | Run of the database fingerprint                                                                     |
+| `status`                 | `UNEXPECTED_MATCH`, `UNEXPECTED_MISMATCH`, `INCONCLUSIVE` (same sample ID only) or `EXPECTED_MATCH` |
+| `lod_score`              | LOD score: log10 likelihood ratio of same vs different individual                                   |
+| `lod_score_tumor_normal` | Tumor-aware LOD score with the sample of this run as tumor                                          |
+| `lod_score_normal_tumor` | Tumor-aware LOD score with the sample of this run as normal                                         |
+
+Rows are sorted by status (unexpected results first), sample and descending LOD. See [usage](usage.md#fingerprint-check-and-fingerprint-database) for the classification.
+
+Columns of `fingerprint_database_fingerprints.tsv` (one row per sample of this run):
+
+| Column                       | Description                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------------- |
+| `fingerprint_id`             | `<sample>@<runid>`                                                                                |
+| `sample`, `runid`            | Sample and run                                                                                    |
+| `haplotype_blocks`           | Haplotype blocks in the fingerprint VCF (= blocks of the haplotype map)                           |
+| `blocks_with_reads`          | Blocks with at least one read (`DP` > 0)                                                          |
+| `fraction_blocks_with_reads` | `blocks_with_reads` / `haplotype_blocks`                                                          |
+| `mean_depth`                 | Mean `DP` over all blocks                                                                         |
+| `self_lod`                   | LOD of the sample's BAM compared with itself in `crosscheck.crosscheck_metrics.txt`               |
+| `status`                     | `SUITABLE` (self LOD ≥ T), `INSUFFICIENT` (self LOD < T) or `NO_COVERAGE` (no block with reads)   |
 
 ### FastQ Screen
 

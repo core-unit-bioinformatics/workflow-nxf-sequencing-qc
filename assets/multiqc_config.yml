@@ -17,19 +17,19 @@ custom_data:
       col1_header: Sample
       sort_rows: true
   exomeqc_purcov_maxmodel:
-    section_name: 'CNV: Purity/Coverage Model'
+    section_name: "CNV: Purity/Coverage Model"
     description: >-
       Maximum normalized log-likelihood by purity across all samples. For each
       sample, the maximum value is shifted to 0.
     plot_type: linegraph
     pconfig:
       id: exomeqc_purcov_line_all_samples
-      title: 'ExomeQC: Purity model (all samples, normalized)'
+      title: "ExomeQC: Purity model (all samples, normalized)"
       xlab: Purity
       ylab: logL - sample max(logL)
       xmin: 0
       xmax: 1
-      tt_label: '{point.x:.3f}: {point.y:.3f}'
+      tt_label: "{point.x:.3f}: {point.y:.3f}"
 report_section_order:
   grz_qc:
     order: 1000
@@ -39,8 +39,12 @@ report_section_order:
     order: 980
   interop:
     order: 970
+  exomeqc_fingerprint_overview:
+    order: 961
   picard:
     order: 960
+  exomeqc_fingerprint_database:
+    order: 955
   exomeqc_vaf_histogram:
     order: 950
   fastq_screen:
@@ -89,8 +93,12 @@ fn_ignore_dirs:
   - .nextflow
   - .nextflow*
 sp:
+  # the crosscheck of this run against the fingerprint database is reported as
+  # exomeqc_fingerprint_database table; it must not enter the Picard heatmap
+  picard/crosscheckfingerprints:
+    exclude_fn: "*fingerprint_database.crosscheck_metrics.txt"
   exomeqc_cnv_metrics:
-    fn: '*cnv-metrics.csv'
+    fn: "*cnv-metrics.csv"
   exomeqc_purcov_maxmodel:
-    fn: '*purcov_maxmodel_lineplot.json'
+    fn: "*purcov_maxmodel_lineplot.json"
 disable_version_detection: true

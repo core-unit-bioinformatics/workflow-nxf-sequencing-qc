@@ -10,7 +10,29 @@
 
 ## Pipeline tools
 
+- [BCFtools](https://pubmed.ncbi.nlm.nih.gov/33590861/)
 
+  > Danecek P, Bonfield JK, Liddle J, Marshall J, Ohan V, Pollard MO, Whitwham A, Keane T, McCarthy SA, Davies RM, Li H. Twelve years of SAMtools and BCFtools. Gigascience. 2021 Feb 16;10(2):giab008. doi: 10.1093/gigascience/giab008. PubMed PMID: 33590861.
+
+- [BWA-MEM2](https://doi.org/10.1109/IPDPS.2019.00041)
+
+  > Vasimuddin Md, Misra S, Li H, Aluru S. Efficient Architecture-Aware Acceleration of BWA-MEM for Multicore Systems. 2019 IEEE International Parallel and Distributed Processing Symposium (IPDPS), 2019, pp. 314-324. doi: 10.1109/IPDPS.2019.00041.
+
+- [FastQ Screen](https://doi.org/10.12688/f1000research.15931.2)
+
+  > Wingett SW, Andrews S. FastQ Screen: A tool for multi-genome mapping and quality control. F1000Research 2018, 7:1338. doi: 10.12688/f1000research.15931.2.
+
+- [Picard](https://broadinstitute.github.io/picard/)
+
+  > Picard Toolkit. 2019. Broad Institute, GitHub Repository. https://broadinstitute.github.io/picard/; Broad Institute. CrosscheckFingerprints, ExtractFingerprint, CreateSequenceDictionary.
+
+- [PyVCF3](https://github.com/dridk/PyVCF3)
+
+  > PyVCF3: Variant Call Format (VCF) parser for Python 3, maintained fork of PyVCF (J. Casbon et al.). GitHub Repository. https://github.com/dridk/PyVCF3 (BSD-3-Clause).
+
+- [SAMtools](https://pubmed.ncbi.nlm.nih.gov/33590861/)
+
+  > Danecek P, Bonfield JK, Liddle J, Marshall J, Ohan V, Pollard MO, Whitwham A, Keane T, McCarthy SA, Davies RM, Li H. Twelve years of SAMtools and BCFtools. Gigascience. 2021 Feb 16;10(2):giab008. doi: 10.1093/gigascience/giab008. PubMed PMID: 33590861.
 
 - [MultiQC](https://pubmed.ncbi.nlm.nih.gov/27312411/)
 
