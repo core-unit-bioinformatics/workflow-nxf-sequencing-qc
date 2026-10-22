@@ -1,0 +1,87 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "fingerprint_database_report"
+description: |
+  Classify the Picard CrosscheckFingerprints comparisons of this run's
+  fingerprints with the fingerprint database and report matches with samples
+  of other sequencing runs as a table and a MultiQC custom content section.
+keywords:
+  - fingerprint
+  - crosscheck
+  - sample identity
+  - qc
+tools:
+  - "fingerprint_database_report.py":
+      description: "exomeqc script (bin/) that classifies fingerprint comparisons with other runs by LOD score"
+      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
+      licence: ["MIT"]
+      identifier: ""
+input:
+  - - meta:
+        type: map
+        description: Run-level metadata map, e.g. `[ id:'fingerprint_database' ]`
+    - crosscheck_metrics:
+        type: file
+        description: CrosscheckFingerprints metrics of this run's fingerprints (INPUT) vs the updated database (SECOND_INPUT), CROSSCHECK_BY SAMPLE, CROSSCHECK_MODE CHECK_ALL_OTHERS
+        pattern: "*.crosscheck_metrics.txt"
+    - run_samples:
+        type: file
+        description: TSV with the columns fingerprint_id, sample, runid for every sample of this run
+        pattern: "*.tsv"
+    - database:
+        type: file
+        description: Updated fingerprint database (multi-sample VCF)
+        pattern: "*.vcf.gz"
+    - previous_database:
+        type: file
+        description: Fingerprint database given to this run (optional, `[]` if none); staged as `previous/*`
+        pattern: "*.vcf.gz"
+output:
+  matches:
+    - - meta:
+          type: map
+          description: Run-level metadata map
+      - "*_matches.tsv":
+          type: file
+          description: Reported comparisons with other runs (sample, runid, database_sample, database_runid, status, LOD scores)
+          pattern: "*_matches.tsv"
+  summary:
+    - - meta:
+          type: map
+          description: Run-level metadata map
+      - "*_summary.tsv":
+          type: file
+          description: Counts of samples, comparisons and classes (metric, value)
+          pattern: "*_summary.tsv"
+  multiqc:
+    - - meta:
+          type: map
+          description: Run-level metadata map
+      - "*_matches_mqc.{tsv,html}":
+          type: file
+          description: MultiQC custom content; a table when comparisons are reported, otherwise an HTML note
+          pattern: "*_matches_mqc.{tsv,html}"
+  versions_python:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - python:
+          type: string
+          description: The name of the tool
+      - python3 --version | sed 's/Python //':
+          type: eval
+          description: The expression to obtain the version of the tool
+topics:
+  versions:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - python:
+          type: string
+          description: The name of the tool
+      - python3 --version | sed 's/Python //':
+          type: eval
+          description: The expression to obtain the version of the tool
+authors:
+  - "@kai"
+maintainers:
+  - "@kai"
