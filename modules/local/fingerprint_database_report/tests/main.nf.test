@@ -1,0 +1,97 @@
+nextflow_process {
+
+    name "Test Process FINGERPRINT_DATABASE_REPORT"
+    script "../main.nf"
+    process "FINGERPRINT_DATABASE_REPORT"
+    config "./nextflow.config"
+
+    tag "modules"
+    tag "modules_local"
+    tag "fingerprint_database_report"
+
+    test("synthetic fixtures - run B vs database with run A") {
+
+        when {
+            process {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint/report"
+                input[0] = [
+                    [ id:'fingerprint_database' ],
+                    file("\${fixtures}/fingerprint_database.crosscheck_metrics.txt", checkIfExists: true),
+                    file("\${fixtures}/run_samples.tsv", checkIfExists: true),
+                    file("\${fixtures}/database.vcf.gz", checkIfExists: true),
+                    file("\${fixtures}/previous_database.vcf.gz", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                // the three classes of the fixture design are reported, unexpected results first
+                { assert path(process.out.matches[0][1]).readLines().collect { line -> line.split('\t')[4] } == ['status', 'UNEXPECTED_MATCH', 'UNEXPECTED_MISMATCH', 'EXPECTED_MATCH'] },
+                { assert file(process.out.multiqc[0][1]).name == 'fingerprint_database_matches_mqc.tsv' },
+                { assert snapshot(
+                    process.out.matches,
+                    process.out.summary,
+                    process.out.multiqc,
+                    process.out.findAll { key, val -> key.startsWith('versions') }
+                ).match() }
+            )
+        }
+    }
+
+    test("synthetic fixtures - no previous database") {
+
+        when {
+            process {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint/report"
+                input[0] = [
+                    [ id:'fingerprint_database' ],
+                    file("\${fixtures}/fingerprint_database.crosscheck_metrics.txt", checkIfExists: true),
+                    file("\${fixtures}/run_samples.tsv", checkIfExists: true),
+                    file("\${fixtures}/database.vcf.gz", checkIfExists: true),
+                    []
+                ]
+                """
+            }
+        }
+
+        then {
+            // without a previous database the database must contain only this run's samples
+            assertAll(
+                { assert process.failed },
+                { assert process.exitStatus == 1 }
+            )
+        }
+    }
+
+    test("synthetic fixtures - stub") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint/report"
+                input[0] = [
+                    [ id:'fingerprint_database' ],
+                    file("\${fixtures}/fingerprint_database.crosscheck_metrics.txt", checkIfExists: true),
+                    file("\${fixtures}/run_samples.tsv", checkIfExists: true),
+                    file("\${fixtures}/database.vcf.gz", checkIfExists: true),
+                    []
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out).match() }
+            )
+        }
+    }
+}
