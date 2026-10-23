@@ -2,10 +2,10 @@
     "-profile test": {
         "content": [
             {
-                "BCFTOOLS_MERGE": {
+                "BCFTOOLS_MERGE_FINGERPRINT_DATABASE": {
                     "bcftools": "1.23.1"
                 },
-                "BCFTOOLS_VIEW": {
+                "BCFTOOLS_VIEW_FINGERPRINT_DATABASE": {
                     "bcftools": "1.23.1"
                 },
                 "BWAMEM2_INDEX": {
@@ -51,14 +51,14 @@
                 "fingerprintcheck/database/fingerprint_database_matches_mqc.tsv",
                 "fingerprintcheck/database/fingerprint_database_summary.tsv",
                 "fingerprintcheck/fingerprints",
-                "fingerprintcheck/fingerprints/100-26_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
-                "fingerprintcheck/fingerprints/100-26_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
-                "fingerprintcheck/fingerprints/200-26_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
-                "fingerprintcheck/fingerprints/200-26_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
-                "fingerprintcheck/fingerprints/300-26_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
-                "fingerprintcheck/fingerprints/300-26_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
-                "fingerprintcheck/fingerprints/400-26_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
-                "fingerprintcheck/fingerprints/400-26_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/SYN002_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/SYN002_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/SYN003_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/SYN003_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/SYN004_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/SYN004_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
                 "multiqc",
                 "multiqc/Exome-Sequencing_multiqc_report.html",
                 "multiqc/Exome-Sequencing_multiqc_report_data",
@@ -86,45 +86,45 @@
                 "pipeline_info/exomeqc_software_mqc_versions.yml",
                 "samplesheet_test.csv",
                 "samtools",
-                "samtools/100-26_3-N_20260201_LH00001_0002_BFIXTURE02.bam.bai",
-                "samtools/200-26_1-T_20260201_LH00001_0002_BFIXTURE02.bam.bai",
-                "samtools/300-26_1-T_20260201_LH00001_0002_BFIXTURE02.bam.bai",
-                "samtools/400-26_3-N_20260201_LH00001_0002_BFIXTURE02.aligned.bam.bai"
+                "samtools/SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.bam.bai",
+                "samtools/SYN002_1-T_20260201_LH00001_0002_BFIXTURE02.bam.bai",
+                "samtools/SYN003_1-T_20260201_LH00001_0002_BFIXTURE02.bam.bai",
+                "samtools/SYN004_3-N_20260201_LH00001_0002_BFIXTURE02.aligned.bam.bai"
             ],
             [
-                "fingerprint_database_matches.tsv:md5,a6830dacb3ec526d7a859a3dfb13a1d6",
-                "fingerprint_database_matches_mqc.tsv:md5,d4b84a34de5b5df51affab8ceef01373",
+                "fingerprint_database_matches.tsv:md5,0fc5481774ff56a43d0fe1a5907ac20e",
+                "fingerprint_database_matches_mqc.tsv:md5,9c99e6dfd6e8c300b34559d1e86eef51",
                 "fingerprint_database_summary.tsv:md5,840f80bb88e068800e57eeb91c70ede8",
                 "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
-                "multiqc_exomeqc_fingerprint_database_table.txt:md5,1b24601c71965e3dce9c55ea03e4bae1",
-                "multiqc_general_stats.txt:md5,edaeadb76de9a261d13744ea75a82102",
-                "multiqc_software_versions.txt:md5,a4921fd47a0e9b724ce4ab5e00ae3648",
-                "picard-crosscheckfingerprints-sample-table.txt:md5,c29e93de76cdde05146863b35b31852c",
+                "multiqc_exomeqc_fingerprint_database_table.txt:md5,7a18846dab68c281a60d82e9482c20d8",
+                "multiqc_general_stats.txt:md5,8396a8cdb0229b6ef8c86b3ab805ea43",
+                "multiqc_software_versions.txt:md5,76160b569d163484fbb3b52bc2bbea5e",
+                "picard-crosscheckfingerprints-sample-table.txt:md5,2eba1ad31f71f6fa36353e01e79b5902",
                 "picard_MarkIlluminaAdapters_histogram.txt:md5,d41d8cd98f00b204e9800998ecf8427e",
                 "picard_MeanQualityByCycle_histogram.txt:md5,d41d8cd98f00b204e9800998ecf8427e",
                 "picard_MeanQualityByCycle_histogram_1.txt:md5,d41d8cd98f00b204e9800998ecf8427e",
                 "picard_QualityScoreDistribution_histogram.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
             ],
             [
-                "100-26_3-N 100-26_3-N 45.379291",
-                "100-26_3-N 200-26_1-T -137.912843",
-                "100-26_3-N 300-26_1-T 45.369513",
-                "100-26_3-N 400-26_3-N -118.156629",
-                "200-26_1-T 100-26_3-N -137.912843",
-                "200-26_1-T 200-26_1-T 45.052624",
-                "200-26_1-T 300-26_1-T -136.695188",
-                "200-26_1-T 400-26_3-N -104.718094",
-                "300-26_1-T 100-26_3-N 45.369513",
-                "300-26_1-T 200-26_1-T -136.695188",
-                "300-26_1-T 300-26_1-T 45.359991",
-                "300-26_1-T 400-26_3-N -117.463955",
-                "400-26_3-N 100-26_3-N -118.156629",
-                "400-26_3-N 200-26_1-T -104.718094",
-                "400-26_3-N 300-26_1-T -117.463955",
-                "400-26_3-N 400-26_3-N 45.550181"
+                "SYN001_3-N SYN001_3-N 45.379291",
+                "SYN001_3-N SYN002_1-T -137.912843",
+                "SYN001_3-N SYN003_1-T 45.369513",
+                "SYN001_3-N SYN004_3-N -118.156629",
+                "SYN002_1-T SYN001_3-N -137.912843",
+                "SYN002_1-T SYN002_1-T 45.052624",
+                "SYN002_1-T SYN003_1-T -136.695188",
+                "SYN002_1-T SYN004_3-N -104.718094",
+                "SYN003_1-T SYN001_3-N 45.369513",
+                "SYN003_1-T SYN002_1-T -136.695188",
+                "SYN003_1-T SYN003_1-T 45.359991",
+                "SYN003_1-T SYN004_3-N -117.463955",
+                "SYN004_3-N SYN001_3-N -118.156629",
+                "SYN004_3-N SYN002_1-T -104.718094",
+                "SYN004_3-N SYN003_1-T -117.463955",
+                "SYN004_3-N SYN004_3-N 45.550181"
             ]
         ],
-        "timestamp": "2026-10-22T21:47:38.937026789",
+        "timestamp": "2026-10-23T17:18:10.437324418",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

@@ -53,7 +53,7 @@ workflow FINGERPRINTCHECK {
         .map { meta, fastqs ->
             // the fingerprint ID needs the RUNID, so every row must have one
             if (!meta.runid) {
-                error("FINGERPRINTCHECK: samplesheet row '${meta.id}': column 'runid' is empty; it is required with --enable_fingerprintcheck (e.g. 20251203_LH00535_0112_A22F5NWLT1)")
+                error("FINGERPRINTCHECK: samplesheet row '${meta.id}': column 'runid' is empty; it is required with --enable_fingerprintcheck (e.g. 20260101_LH00001_0001_AFIXTURE01)")
             }
             // reject sample names that would be unsafe as VCF sample or file names
             if (!(meta.id ==~ name_pattern)) {

@@ -4,17 +4,19 @@
 The fixtures are fully synthetic: a random 20 kb reference contig, a Picard
 haplotype map with 100 bi-allelic SNPs, and simulated paired-end reads of four
 synthetic individuals (P1-P4) with known genotypes. They contain no real
-sequence or patient data. Samples are spread over two synthetic sequencing
-runs so that every case of the fingerprint database comparison is covered:
+sequence or patient data. Sample IDs (SYN001 ...) and run IDs (flow cell
+AFIXTURE01 / BFIXTURE02) are made up and do not follow the numbering of real
+cases. Samples are spread over two synthetic sequencing runs so that every
+case of the fingerprint database comparison is covered:
 
     run A (20260101_LH00001_0001_AFIXTURE01), used to build a database:
-        100-26_3-N  individual P1
-        200-26_1-T  individual P2
+        SYN001_3-N  individual P1
+        SYN002_1-T  individual P2
     run B (20260201_LH00001_0002_BFIXTURE02), checked against that database:
-        100-26_3-N  individual P1  same sample ID as in run A, same person
-        300-26_1-T  individual P1  other sample ID, same person as in run A
-        200-26_1-T  individual P3  same sample ID as in run A, other person
-        400-26_3-N  individual P4  no match; FASTQ only (alignment path)
+        SYN001_3-N  individual P1  same sample ID as in run A, same person
+        SYN003_1-T  individual P1  other sample ID, same person as in run A
+        SYN002_1-T  individual P3  same sample ID as in run A, other person
+        SYN004_3-N  individual P4  no match; FASTQ only (alignment path)
 
 Requires pysam (only needed to regenerate the fixtures, not to run the
 pipeline). The output is deterministic for a given --seed.
@@ -45,12 +47,12 @@ RUN_B = "20260201_LH00001_0002_BFIXTURE02"
 
 # (run, sample, individual, write_bam) for every simulated sequencing sample
 SAMPLES = [
-    (RUN_A, "100-26_3-N", "P1", True),
-    (RUN_A, "200-26_1-T", "P2", True),
-    (RUN_B, "100-26_3-N", "P1", True),
-    (RUN_B, "300-26_1-T", "P1", True),
-    (RUN_B, "200-26_1-T", "P3", True),
-    (RUN_B, "400-26_3-N", "P4", False),
+    (RUN_A, "SYN001_3-N", "P1", True),
+    (RUN_A, "SYN002_1-T", "P2", True),
+    (RUN_B, "SYN001_3-N", "P1", True),
+    (RUN_B, "SYN003_1-T", "P1", True),
+    (RUN_B, "SYN002_1-T", "P3", True),
+    (RUN_B, "SYN004_3-N", "P4", False),
 ]
 INDIVIDUALS = ["P1", "P2", "P3", "P4"]
 
@@ -128,7 +130,7 @@ def haplotype_sequence(sequence, snps, haplotype):
     return "".join(bases)
 
 
-def simulate_sample(outdir, run, sample, haplotypes, write_bam, rng, dict_lines):
+def simulate_sample(outdir, run, sample, haplotypes, write_bam, rng):
     """Simulate error-free read pairs of one sample, write FASTQ (and BAM)."""
     prefix = f"{sample}_{run}"
     n_pairs = CONTIG_LENGTH * COVERAGE // (2 * READ_LENGTH)
@@ -143,14 +145,17 @@ def simulate_sample(outdir, run, sample, haplotypes, write_bam, rng, dict_lines)
         reverse = haplotype[mate_start : mate_start + READ_LENGTH]
         pairs.append((f"{prefix}:{pair_index}", start, forward, mate_start, reverse))
 
-    # write R1 (forward strand) and R2 (reverse strand) FASTQ files
-    with gzip.open(outdir / f"{prefix}_R1.fastq.gz", "wt") as r1, gzip.open(
-        outdir / f"{prefix}_R2.fastq.gz", "wt"
-    ) as r2:
+    # write R1 (forward strand) and R2 (reverse strand) FASTQ files; mtime=0
+    # keeps the gzip header free of the creation time
+    with gzip.GzipFile(
+        outdir / f"{prefix}_R1.fastq.gz", "wb", mtime=0
+    ) as r1, gzip.GzipFile(outdir / f"{prefix}_R2.fastq.gz", "wb", mtime=0) as r2:
         for name, _start, forward, _mate_start, reverse in pairs:
-            r1.write(f"@{name}/1\n{forward}\n+\n{BASE_QUALITY * READ_LENGTH}\n")
+            r1.write(
+                f"@{name}/1\n{forward}\n+\n{BASE_QUALITY * READ_LENGTH}\n".encode()
+            )
             r2.write(
-                f"@{name}/2\n{reverse_complement(reverse)}\n+\n{BASE_QUALITY * READ_LENGTH}\n"
+                f"@{name}/2\n{reverse_complement(reverse)}\n+\n{BASE_QUALITY * READ_LENGTH}\n".encode()
             )
 
     if not write_bam:
@@ -182,9 +187,10 @@ def simulate_sample(outdir, run, sample, haplotypes, write_bam, rng, dict_lines)
                 read.template_length = INSERT_SIZE if is_read1 else -INSERT_SIZE
                 read.set_tag("RG", prefix)
                 bam.write(read)
-    # coordinate-sort and index the BAM, then remove the unsorted file
+    # coordinate-sort without a @PG line (it would record the local command
+    # line), index the BAM, then remove the unsorted file
     sorted_bam = outdir / f"{prefix}.bam"
-    pysam.sort("-o", str(sorted_bam), str(unsorted_bam))
+    pysam.sort("--no-PG", "-o", str(sorted_bam), str(unsorted_bam))
     pysam.index(str(sorted_bam))
     unsorted_bam.unlink()
 
@@ -214,16 +220,16 @@ def main():
     snps = write_haplotype_map(args.outdir, sequence, dict_lines, rng)
     genotypes = draw_genotypes(snps, rng)
     write_genotype_table(args.outdir, snps, genotypes)
-    for run, sample, individual, write_bam in SAMPLES:
+    for run_id, sample, individual, write_bam in SAMPLES:
         # build both haplotype sequences of the individual this sample comes from
         haplotypes = [
             haplotype_sequence(sequence, snps, genotypes[individual][h])
             for h in range(2)
         ]
-        simulate_sample(
-            args.outdir, run, sample, haplotypes, write_bam, rng, dict_lines
+        simulate_sample(args.outdir, run_id, sample, haplotypes, write_bam, rng)
+        print(
+            f"INFO: simulated {sample} ({individual}) of run {run_id}", file=sys.stderr
         )
-        print(f"INFO: simulated {sample} ({individual}) of run {run}", file=sys.stderr)
 
 
 if __name__ == "__main__":

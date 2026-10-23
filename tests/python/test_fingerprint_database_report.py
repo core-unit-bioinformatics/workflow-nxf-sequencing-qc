@@ -93,8 +93,8 @@ def write_metrics(path, comparisons, header=METRIC_HEADER):
 def scenario(tmp_path, monkeypatch):
     """Run B (3 samples) against a previous database with 2 run-A samples."""
     monkeypatch.chdir(tmp_path)
-    run = [fid("100-26_3-N", RUN_B), fid("300-26_1-T", RUN_B), fid("200-26_1-T", RUN_B)]
-    previous = [fid("100-26_3-N", RUN_A), fid("200-26_1-T", RUN_A)]
+    run = [fid("SYN001_3-N", RUN_B), fid("SYN003_1-T", RUN_B), fid("SYN002_1-T", RUN_B)]
+    previous = [fid("SYN001_3-N", RUN_A), fid("SYN002_1-T", RUN_A)]
     write_run_samples("run.tsv", run)
     write_vcf_header("previous.vcf.gz", previous)
     write_vcf_header("database.vcf.gz", run + previous)
@@ -161,9 +161,9 @@ def test_report_with_previous_database(scenario, capsys):
         for r in rows
     }
     assert observed == {
-        ("300-26_1-T", "100-26_3-N", RUN_A, "UNEXPECTED_MATCH"),
-        ("200-26_1-T", "200-26_1-T", RUN_A, "UNEXPECTED_MISMATCH"),
-        ("100-26_3-N", "100-26_3-N", RUN_A, "EXPECTED_MATCH"),
+        ("SYN003_1-T", "SYN001_3-N", RUN_A, "UNEXPECTED_MATCH"),
+        ("SYN002_1-T", "SYN002_1-T", RUN_A, "UNEXPECTED_MISMATCH"),
+        ("SYN001_3-N", "SYN001_3-N", RUN_A, "EXPECTED_MATCH"),
     }
     # rows are ordered by status priority
     assert [r["status"] for r in rows] == [
@@ -181,7 +181,7 @@ def test_report_with_previous_database(scenario, capsys):
     # the MultiQC table is written, the empty-report note is not
     mqc = Path("fingerprint_database_matches_mqc.tsv").read_text()
     assert "# id: 'exomeqc_fingerprint_database'" in mqc
-    assert f"300-26_1-T@{RUN_B} vs 100-26_3-N@{RUN_A}" in mqc
+    assert f"SYN003_1-T@{RUN_B} vs SYN001_3-N@{RUN_A}" in mqc
     assert not Path("fingerprint_database_matches_mqc.html").exists()
     assert (
         "WARNING: 1 unexpected match(es) and 1 unexpected mismatch(es)"
@@ -191,8 +191,8 @@ def test_report_with_previous_database(scenario, capsys):
 
 def test_replaced_fingerprints_are_counted(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    run = [fid("100-26_3-N", RUN_B)]
-    previous = [fid("100-26_3-N", RUN_B), fid("100-26_3-N", RUN_A)]
+    run = [fid("SYN001_3-N", RUN_B)]
+    previous = [fid("SYN001_3-N", RUN_B), fid("SYN001_3-N", RUN_A)]
     write_run_samples("run.tsv", run)
     write_vcf_header("previous.vcf.gz", previous)
     write_vcf_header("database.vcf.gz", previous)
@@ -219,7 +219,7 @@ def test_replaced_fingerprints_are_counted(tmp_path, monkeypatch, capsys):
 
 def test_no_previous_database_writes_note(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    run = [fid("100-26_3-N", RUN_A), fid("200-26_1-T", RUN_A)]
+    run = [fid("SYN001_3-N", RUN_A), fid("SYN002_1-T", RUN_A)]
     write_run_samples("run.tsv", run)
     write_vcf_header("database.vcf.gz", run)
     write_metrics(
@@ -297,14 +297,14 @@ def test_error_missing_comparison(scenario, capsys):
 
 def test_error_unknown_database_sample(scenario, capsys):
     comparisons = scenario["comparisons"] + [
-        (scenario["run"][0], fid("999-26_1-T", RUN_A), -50.0)
+        (scenario["run"][0], fid("SYN999_1-T", RUN_A), -50.0)
     ]
     write_metrics("metrics.txt", comparisons)
     run_expecting_error(scenario["args"], capsys, "is not in the fingerprint database")
 
 
 def test_error_foreign_database_sample_name(scenario, capsys):
-    write_vcf_header("previous.vcf.gz", ["TUMOR", fid("200-26_1-T", RUN_A)])
+    write_vcf_header("previous.vcf.gz", ["TUMOR", fid("SYN002_1-T", RUN_A)])
     run_expecting_error(
         scenario["args"], capsys, "fingerprint ID 'TUMOR' is not of the form"
     )
@@ -326,10 +326,10 @@ def test_error_database_lost_previous_samples(scenario, capsys):
 
 def test_error_duplicate_run_sample(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    write_run_samples("run.tsv", [fid("100-26_3-N", RUN_B), fid("100-26_3-N", RUN_B)])
-    write_vcf_header("database.vcf.gz", [fid("100-26_3-N", RUN_B)])
+    write_run_samples("run.tsv", [fid("SYN001_3-N", RUN_B), fid("SYN001_3-N", RUN_B)])
+    write_vcf_header("database.vcf.gz", [fid("SYN001_3-N", RUN_B)])
     write_metrics(
-        "metrics.txt", [(fid("100-26_3-N", RUN_B), fid("100-26_3-N", RUN_B), 40.0)]
+        "metrics.txt", [(fid("SYN001_3-N", RUN_B), fid("SYN001_3-N", RUN_B), 40.0)]
     )
     run_expecting_error(
         [

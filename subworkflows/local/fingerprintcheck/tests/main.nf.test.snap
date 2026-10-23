@@ -16,14 +16,14 @@
             "nextflow": "26.04.4"
         }
     },
-    "run B against database of run A, 400-26_3-N aligned with bwa-mem2": {
+    "run B against database of run A, SYN004_3-N aligned with bwa-mem2": {
         "content": [
             [
                 [
                     {
                         "id": "fingerprint_database"
                     },
-                    "fingerprint_database_matches.tsv:md5,a6830dacb3ec526d7a859a3dfb13a1d6"
+                    "fingerprint_database_matches.tsv:md5,0fc5481774ff56a43d0fe1a5907ac20e"
                 ]
             ],
             [
@@ -36,7 +36,7 @@
             ],
             [
                 [
-                    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t100-26_3-N@20260201_LH00001_0002_BFIXTURE02",
+                    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSYN001_3-N@20260201_LH00001_0002_BFIXTURE02",
                     "chr1\t500\t.\tA\tC\t.\t.\t.\tAD:DP:PL\t12,9:21:270,0,381",
                     "chr1\t690\t.\tC\tG\t.\t.\t.\tAD:DP:PL\t10,0:10:0,30,370",
                     "chr1\t880\t.\tT\tG\t.\t.\t.\tAD:DP:PL\t7,8:15:251,0,214",
@@ -139,7 +139,7 @@
                     "chr1\t19310\t.\tA\tC\t.\t.\t.\tAD:DP:PL\t8,6:14:180,0,254"
                 ],
                 [
-                    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t200-26_1-T@20260201_LH00001_0002_BFIXTURE02",
+                    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSYN002_1-T@20260201_LH00001_0002_BFIXTURE02",
                     "chr1\t500\t.\tA\tC\t.\t.\t.\tAD:DP:PL\t13,21:34:675,0,379",
                     "chr1\t690\t.\tC\tG\t.\t.\t.\tAD:DP:PL\t12,0:12:0,36,444",
                     "chr1\t880\t.\tT\tG\t.\t.\t.\tAD:DP:PL\t16,0:16:0,48,592",
@@ -242,7 +242,7 @@
                     "chr1\t19310\t.\tA\tC\t.\t.\t.\tAD:DP:PL\t8,8:16:248,0,248"
                 ],
                 [
-                    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t300-26_1-T@20260201_LH00001_0002_BFIXTURE02",
+                    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSYN003_1-T@20260201_LH00001_0002_BFIXTURE02",
                     "chr1\t500\t.\tA\tC\t.\t.\t.\tAD:DP:PL\t12,10:22:304,0,378",
                     "chr1\t690\t.\tC\tG\t.\t.\t.\tAD:DP:PL\t9,0:9:0,27,333",
                     "chr1\t880\t.\tT\tG\t.\t.\t.\tAD:DP:PL\t6,6:12:186,0,186",
@@ -345,7 +345,7 @@
                     "chr1\t19310\t.\tA\tC\t.\t.\t.\tAD:DP:PL\t9,13:22:415,0,267"
                 ],
                 [
-                    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t400-26_3-N@20260201_LH00001_0002_BFIXTURE02",
+                    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSYN004_3-N@20260201_LH00001_0002_BFIXTURE02",
                     "chr1\t500\t.\tA\tC\t.\t.\t.\tAD:DP:PL\t19,0:19:0,57,703",
                     "chr1\t690\t.\tC\tG\t.\t.\t.\tAD:DP:PL\t7,6:13:183,0,220",
                     "chr1\t880\t.\tT\tG\t.\t.\t.\tAD:DP:PL\t0,8:8:296,24,0",
@@ -449,7 +449,7 @@
                 ]
             ]
         ],
-        "timestamp": "2026-10-22T20:54:43.380578379",
+        "timestamp": "2026-10-23T17:03:36.227377901",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"
