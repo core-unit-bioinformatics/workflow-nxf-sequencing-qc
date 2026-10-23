@@ -20,8 +20,8 @@ include { BWAMEM2_MEM                                                           
 include { SAMTOOLS_INDEX                                                         } from '../../../modules/nf-core/samtools/index/main'
 include { PICARD_CROSSCHECKFINGERPRINTS                                          } from '../../../modules/nf-core/picard/crosscheckfingerprints/main'
 include { PICARD_EXTRACTFINGERPRINT                                              } from '../../../modules/nf-core/picard/extractfingerprint/main'
-include { BCFTOOLS_VIEW                                                          } from '../../../modules/nf-core/bcftools/view/main'
-include { BCFTOOLS_MERGE                                                         } from '../../../modules/nf-core/bcftools/merge/main'
+include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_FINGERPRINT_DATABASE   } from '../../../modules/nf-core/bcftools/view/main'
+include { BCFTOOLS_MERGE as BCFTOOLS_MERGE_FINGERPRINT_DATABASE } from '../../../modules/nf-core/bcftools/merge/main'
 include { PICARD_CROSSCHECKFINGERPRINTS as PICARD_CROSSCHECKFINGERPRINTS_DATABASE } from '../../../modules/nf-core/picard/crosscheckfingerprints/main'
 include { FINGERPRINT_DATABASE_REPORT                                            } from '../../../modules/local/fingerprint_database_report/main'
 
@@ -244,11 +244,11 @@ workflow FINGERPRINTCHECK {
                 [ [ id: 'previous_fingerprint_database', exclude_ids: ids.sort() ], previous_database_file, previous_database_index ]
             }
 
-        BCFTOOLS_VIEW(ch_previous_database, [], [], [])
+        BCFTOOLS_VIEW_FINGERPRINT_DATABASE(ch_previous_database, [], [], [])
 
         // filtered previous database as one-element lists: [ [ vcf ], [ tbi ] ]
-        ch_previous_filtered = BCFTOOLS_VIEW.out.vcf
-            .join(BCFTOOLS_VIEW.out.index, by: 0, failOnMismatch: true)
+        ch_previous_filtered = BCFTOOLS_VIEW_FINGERPRINT_DATABASE.out.vcf
+            .join(BCFTOOLS_VIEW_FINGERPRINT_DATABASE.out.index, by: 0, failOnMismatch: true)
             .map { _meta, vcf, tbi -> [ [ vcf ], [ tbi ] ] }
     } else {
         ch_previous_filtered = channel.value([ [], [] ])
@@ -263,11 +263,11 @@ workflow FINGERPRINTCHECK {
             [ [ id: 'exomeqc_fingerprint_database' ], vcfs + previous_vcfs, tbis + previous_tbis, [] ]
         }
 
-    BCFTOOLS_MERGE(ch_merge_input, [ [:], [], [] ])
+    BCFTOOLS_MERGE_FINGERPRINT_DATABASE(ch_merge_input, [ [:], [], [] ])
 
     // updated database with its index: [ meta, vcf, tbi ]
-    ch_database = BCFTOOLS_MERGE.out.vcf
-        .join(BCFTOOLS_MERGE.out.index, by: 0, failOnMismatch: true)
+    ch_database = BCFTOOLS_MERGE_FINGERPRINT_DATABASE.out.vcf
+        .join(BCFTOOLS_MERGE_FINGERPRINT_DATABASE.out.index, by: 0, failOnMismatch: true)
 
     // -------------------------------------------------------------------------
     // 2d. Crosscheck this run's fingerprints against the updated database
