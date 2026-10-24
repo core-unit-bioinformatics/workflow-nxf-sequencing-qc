@@ -1,0 +1,114 @@
+nextflow_pipeline {
+
+    name "Test pipeline - MultiQC report name"
+    script "../main.nf"
+    tag "pipeline"
+    tag "multiqc_report_name"
+
+    // All QC steps are switched off, so only MultiQC runs. The samplesheet and the
+    // MultiQC input list are written into the test's output directory, because
+    // their paths must be absolute.
+
+    test("--multiqc_report_name sets the report file name") {
+
+        when {
+            params {
+                def fixtures = new File("${projectDir}/tests/fixtures/multiqc_report_name")
+                def samplesheet = new File("${outputDir}/samplesheet.csv")
+                samplesheet.parentFile.mkdirs()
+                samplesheet.text = "sample,fastq_1,fastq_2\nSAMPLE1,${fixtures}/SAMPLE1_R1.fastq.gz,${fixtures}/SAMPLE1_R2.fastq.gz\n"
+                def multiqc_list = new File("${outputDir}/multiqc_inputs.csv")
+                multiqc_list.text = "paths\n${fixtures}\n"
+
+                input                   = samplesheet.path
+                multiqc_inputs          = multiqc_list.path
+                outdir                  = "${outputDir}/results"
+                enable_fastqscreen      = false
+                enable_fingerprintcheck = false
+                enable_cnvqc            = false
+                // the test profile sets an iGenomes genome, which is not needed here
+                genome                  = null
+                igenomes_ignore         = true
+                multiqc_title           = "Exome Sequencing"
+                multiqc_report_name     = "20261023_LH00001_0001_ATEST"
+            }
+        }
+
+        then {
+            def multiqc_files = new File("${outputDir}/results/multiqc").list().sort()
+            assertAll(
+                { assert workflow.success },
+                // the report, its data and plots carry the given name, not the title
+                { assert multiqc_files.contains('20261023_LH00001_0001_ATEST.html') },
+                { assert multiqc_files.contains('20261023_LH00001_0001_ATEST_data') },
+                { assert !multiqc_files.any { name -> name.endsWith('multiqc_report.html') } },
+                // the title is still printed in the report
+                { assert path("${outputDir}/results/multiqc/20261023_LH00001_0001_ATEST.html").text.contains('Exome Sequencing') }
+            )
+        }
+    }
+
+    test("without --multiqc_report_name the title-based default name is kept") {
+
+        when {
+            params {
+                def fixtures = new File("${projectDir}/tests/fixtures/multiqc_report_name")
+                def samplesheet = new File("${outputDir}/samplesheet.csv")
+                samplesheet.parentFile.mkdirs()
+                samplesheet.text = "sample,fastq_1,fastq_2\nSAMPLE1,${fixtures}/SAMPLE1_R1.fastq.gz,${fixtures}/SAMPLE1_R2.fastq.gz\n"
+                def multiqc_list = new File("${outputDir}/multiqc_inputs.csv")
+                multiqc_list.text = "paths\n${fixtures}\n"
+
+                input                   = samplesheet.path
+                multiqc_inputs          = multiqc_list.path
+                outdir                  = "${outputDir}/results"
+                enable_fastqscreen      = false
+                enable_fingerprintcheck = false
+                enable_cnvqc            = false
+                // the test profile sets an iGenomes genome, which is not needed here
+                genome                  = null
+                igenomes_ignore         = true
+                multiqc_title           = "Exome Sequencing"
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert new File("${outputDir}/results/multiqc/Exome-Sequencing_multiqc_report.html").exists() }
+            )
+        }
+    }
+
+    test("error - --multiqc_report_name with .html or a space") {
+
+        when {
+            params {
+                def fixtures = new File("${projectDir}/tests/fixtures/multiqc_report_name")
+                def samplesheet = new File("${outputDir}/samplesheet.csv")
+                samplesheet.parentFile.mkdirs()
+                samplesheet.text = "sample,fastq_1,fastq_2\nSAMPLE1,${fixtures}/SAMPLE1_R1.fastq.gz,${fixtures}/SAMPLE1_R2.fastq.gz\n"
+                def multiqc_list = new File("${outputDir}/multiqc_inputs.csv")
+                multiqc_list.text = "paths\n${fixtures}\n"
+
+                input                   = samplesheet.path
+                multiqc_inputs          = multiqc_list.path
+                outdir                  = "${outputDir}/results"
+                enable_fastqscreen      = false
+                enable_fingerprintcheck = false
+                enable_cnvqc            = false
+                // the test profile sets an iGenomes genome, which is not needed here
+                genome                  = null
+                igenomes_ignore         = true
+                multiqc_report_name     = "RUN 1.html"
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.failed },
+                { assert workflow.stderr.any { line -> line.contains('--multiqc_report_name (RUN 1.html)') && line.contains('does not match regular expression') } }
+            )
+        }
+    }
+}
