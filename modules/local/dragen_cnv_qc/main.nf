@@ -45,6 +45,7 @@ process DRAGEN_CNV_QC {
     echo $args
     
     touch cnv-metrics.csv
+    touch purcov_maxmodel_lineplot.json
     touch pur-cov-allmodel-stub.png
     touch pur-cov-maxmodel-stub.png
     touch karyoplot-stub-tn.png
