@@ -1,0 +1,72 @@
+{
+    "default params - 0.05 bins, all samples, PASS only": {
+        "content": [
+            [
+                "vaf_histogram.tsv:md5,a24aa905688665026852aa389838c6e6"
+            ],
+            [
+                "vaf_histogram_summary.tsv:md5,1862d3880978dd8bc2b77807f7b885b4"
+            ],
+            [
+                "vaf_histogram_mqc.json:md5,7bf734f9ca6d158583c688a62744faff"
+            ],
+            {
+                "versions_python": [
+                    [
+                        "VAF_HISTOGRAM",
+                        "python",
+                        "3.12.15"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-10-24T12:01:33.902686413",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "default params - stub": {
+        "content": [
+            {
+                "0": [
+                    "vaf_histogram.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "1": [
+                    "vaf_histogram_summary.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "2": [
+                    "vaf_histogram_mqc.json:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "3": [
+                    [
+                        "VAF_HISTOGRAM",
+                        "python",
+                        "3.12.15"
+                    ]
+                ],
+                "multiqc": [
+                    "vaf_histogram_mqc.json:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "summary": [
+                    "vaf_histogram_summary.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "tsv": [
+                    "vaf_histogram.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "versions_python": [
+                    [
+                        "VAF_HISTOGRAM",
+                        "python",
+                        "3.12.15"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-10-24T12:09:48.890209185",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}

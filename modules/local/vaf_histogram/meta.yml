@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "vaf_histogram"
+description: Count variants per variant allele fraction (VAF) bin for a MultiQC histogram (bin/vaf_histogram.py)
+keywords:
+  - vaf
+  - allele fraction
+  - histogram
+  - vcf
+  - multiqc
+tools:
+  - "python":
+      description: "Python, runs bin/vaf_histogram.py (standard library only)"
+      homepage: "https://www.python.org"
+      documentation: "https://docs.python.org/3/"
+      licence: ["PSF-2.0"]
+      identifier: ""
+
+input:
+  - vcfs:
+      type: file
+      description: Small-variant VCFs (plain or gzipped), e.g. DRAGEN `*.hard-filtered.vcf.gz`; one histogram per VCF sample column
+      pattern: "*.{vcf,vcf.gz}"
+
+output:
+  tsv:
+    - "${task.ext.prefix ?: 'vaf_histogram'}.tsv":
+        type: file
+        description: Variants per sample and VAF bin (sample, vcf, bin_start, bin_end, variants)
+        pattern: "*.tsv"
+  summary:
+    - "${task.ext.prefix ?: 'vaf_histogram'}_summary.tsv":
+        type: file
+        description: Per sample, records and alleles read, counted and skipped (with the reason)
+        pattern: "*_summary.tsv"
+  multiqc:
+    - "${task.ext.prefix ?: 'vaf_histogram'}_mqc.json":
+        type: file
+        description: MultiQC custom content, line graph with one VAF histogram per sample
+        pattern: "*_mqc.json"
+  versions_python:
+    - - "${task.process}":
+          type: string
+          description: The name of the process
+      - "python":
+          type: string
+          description: The name of the tool
+      - "python3 --version | sed 's/Python //'":
+          type: eval
+          description: The expression to obtain the version of the tool
+
+topics:
+  versions:
+    - - "${task.process}":
+          type: string
+          description: The name of the process
+      - "python":
+          type: string
+          description: The name of the tool
+      - "python3 --version | sed 's/Python //'":
+          type: eval
+          description: The expression to obtain the version of the tool
+
+authors:
+  - "@sci-kai"
+maintainers:
+  - "@sci-kai"
