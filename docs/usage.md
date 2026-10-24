@@ -84,6 +84,14 @@ You can also control duplicate-read handling in fingerprinting with:
 --fingerprint_allow_duplicate_reads true
 ```
 
+To name the MultiQC report after the run, add e.g.:
+
+```bash
+--multiqc_report_name 20261023_LH00001_0001_AHXXXXXXX
+```
+
+The report is then written to `<OUTDIR>/multiqc/20261023_LH00001_0001_AHXXXXXXX.html`. The name may contain `A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, must start with a letter or digit and must not end in `.html`; other names stop the pipeline at parameter validation. `--multiqc_title` still sets the title printed in the report.
+
 This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.
 
 Note that the pipeline will create the following files in your working directory:
