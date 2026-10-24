@@ -1,0 +1,125 @@
+nextflow_process {
+
+    name "Test Process CHECK_FINGERPRINT_DATABASE"
+    script "../main.nf"
+    process "CHECK_FINGERPRINT_DATABASE"
+
+    tag "modules"
+    tag "modules_local"
+    tag "check_fingerprint_database"
+
+    // Synthetic fixtures, see tests/fixtures/fingerprint/make_fingerprint_fixtures.py:
+    // report/previous_database.vcf.gz holds run A, report/database.vcf.gz run A
+    // and run B, report/run_fingerprint_ids.txt the fingerprint IDs of run B.
+
+    test("database of run A, checked by run B") {
+
+        when {
+            process {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                input[0] = [ [ id:'previous_database' ], file("\${fixtures}/report/previous_database.vcf.gz", checkIfExists: true) ]
+                input[1] = file("\${fixtures}/haplotype_map.txt", checkIfExists: true)
+                input[2] = file("\${fixtures}/report/run_fingerprint_ids.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                // nothing of run B is in the database of run A: both fingerprints are kept
+                { assert path(process.out.keep[0][1]).readLines() == [ 'SYN001_3-N@20260101_LH00001_0001_AFIXTURE01', 'SYN002_1-T@20260101_LH00001_0001_AFIXTURE01' ] },
+                { assert path(process.out.check[0][1]).readLines().contains('database_compression\tbgzip') },
+                { assert snapshot(
+                    process.out.samples,
+                    process.out.keep,
+                    process.out.check,
+                    process.out.findAll { key, val -> key.startsWith('versions') }
+                ).match() }
+            )
+        }
+    }
+
+    test("database with run B, checked by run B") {
+
+        when {
+            process {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                input[0] = [ [ id:'previous_database' ], file("\${fixtures}/report/database.vcf.gz", checkIfExists: true) ]
+                input[1] = file("\${fixtures}/haplotype_map.txt", checkIfExists: true)
+                input[2] = file("\${fixtures}/report/run_fingerprint_ids.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            def samples = path(process.out.samples[0][1]).readLines()
+            assertAll(
+                { assert process.success },
+                // the three fingerprints of run B are replaced, run A is kept
+                { assert samples.findAll { line -> line.endsWith('\treplace') }.size() == 3 },
+                { assert samples.findAll { line -> line.endsWith('\tkeep') }.size() == 2 },
+                { assert path(process.out.keep[0][1]).readLines().every { id -> id.endsWith('@20260101_LH00001_0001_AFIXTURE01') } },
+                { assert path(process.out.check[0][1]).readLines().contains('replaced_fingerprints\t3') }
+            )
+        }
+    }
+
+    test("error - haplotype map with other positions") {
+
+        when {
+            process {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                // the same map with every SNP one base further
+                def other_map = file("${outputDir}/other_haplotype_map.txt")
+                other_map.text = file("\${fixtures}/haplotype_map.txt").readLines()
+                    .collect { line ->
+                        def fields = line.split('\\t', -1)
+                        if (fields[0] == 'chr1') {
+                            fields[1] = (fields[1].toInteger() + 1).toString()
+                        }
+                        fields.join('\\t')
+                    }
+                    .join('\\n') + '\\n'
+                input[0] = [ [ id:'previous_database' ], file("\${fixtures}/report/previous_database.vcf.gz", checkIfExists: true) ]
+                input[1] = other_map
+                input[2] = file("\${fixtures}/report/run_fingerprint_ids.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.failed },
+                { assert process.exitStatus == 1 },
+                { assert (process.stdout + process.stderr).join('\n').contains('ERROR: previous_database.vcf.gz does not match the haplotype map other_haplotype_map.txt: 100 of 100 records are not SNPs of the map') }
+            )
+        }
+    }
+
+    test("database of run A - stub") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                input[0] = [ [ id:'previous_database' ], file("\${fixtures}/report/previous_database.vcf.gz", checkIfExists: true) ]
+                input[1] = file("\${fixtures}/haplotype_map.txt", checkIfExists: true)
+                input[2] = file("\${fixtures}/report/run_fingerprint_ids.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out).match() }
+            )
+        }
+    }
+}
