@@ -24,9 +24,12 @@ process DRAGEN_CNV_QC {
     def prefix = task.ext.prefix ?: ""
     
     """
+    # compute the CNV QC metrics and PASS/FAIL status; \$args carries the
+    # QC thresholds from conf/modules.config (omitted thresholds are not checked)
     analyze_cnv_metrics.R \\
         --dragen $dragen_dirs \\
-        --prefix "${prefix}"
+        --prefix "${prefix}" \\
+        $args
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
