@@ -1,0 +1,63 @@
+{
+    "auto VAF source - stub": {
+        "content": [
+            {
+                "0": [
+                    "vaf_histogram.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "1": [
+                    "vaf_histogram_summary.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "2": [
+                    "vaf_histogram_mqc.json:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "3": [
+                    [
+                        "VAF_HISTOGRAM",
+                        "python",
+                        "3.12.16"
+                    ]
+                ],
+                "multiqc": [
+                    "vaf_histogram_mqc.json:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "summary": [
+                    "vaf_histogram_summary.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "tsv": [
+                    "vaf_histogram.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "versions_python": [
+                    [
+                        "VAF_HISTOGRAM",
+                        "python",
+                        "3.12.16"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-11-17T13:15:58.82767614",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "DRAGEN, Mutect2, FreeBayes - auto VAF source, tumor columns": {
+        "content": [
+            [
+                "vaf_histogram.tsv:md5,5180d79941b22ef18e656f4038d25f41"
+            ],
+            [
+                "vaf_histogram_summary.tsv:md5,1e8ff56e4aef562060e90713359f3398"
+            ],
+            [
+                "vaf_histogram_mqc.json:md5,7cb9531f2f9323473003762a84d1ab06"
+            ]
+        ],
+        "timestamp": "2026-11-17T13:11:56.729953068",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}

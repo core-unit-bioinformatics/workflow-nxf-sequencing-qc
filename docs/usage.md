@@ -51,6 +51,7 @@ TREATMENT_REP3,AEG588A6_S6_L004_R1_001.fastq.gz,
 Optional columns for fingerprint checking:
 
 - `bam`: Full path to a BAM/CRAM file for a sample row when fingerprint check is enabled.
+- `vcf`: Full path to a small-variant VCF (`.vcf` or `.vcf.gz`, any caller) of the sample, used for the [VAF histogram](#vaf-histogram). All rows of a sample must give the same `vcf` or none.
 
 An [example samplesheet](../assets/samplesheet.csv) has been provided with the pipeline.
 
@@ -148,6 +149,28 @@ A sample always fails if DRAGEN found no purity model (`EstimatedTumorPurity=NA`
 | `total_excluded_bp_max`         | total bp in `*.cnv.excluded_intervals.bed.gz` (`total_excluded_bp`) | value > max |
 
 The limits themselves pass (e.g. a purity of exactly `purity_min` passes). Purity is a fraction: `--purity_min 0.4` means 40 %. A value outside [0, 1] (e.g. `40`) stops the pipeline with an `ERROR`, as does any non-numeric threshold or an unknown option passed to the script.
+
+### VAF histogram
+
+With `--enable_vaf_histogram` (default `false`), `bin/vaf_histogram.py` counts the variants per variant allele fraction (VAF) bin in the VCF of every sample that has a `vcf` in the samplesheet, and adds the section "Variant allele fraction" to the MultiQC report: one histogram per sample (switch with the buttons above the plot), x-axis VAF, y-axis number of variants. The VCF can come from any variant caller. Samples without `vcf` (e.g. the normal of a tumor/normal pair whose VCF is given in the tumor row) get no histogram; if no sample has a `vcf`, the pipeline stops with an `ERROR` (remove `--enable_vaf_histogram` to run without).
+
+| Parameter                        | Default               | Meaning                                                                                                                                                             |
+| -------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enable_vaf_histogram`           | `false`               | Run the VAF histogram; needs the samplesheet column `vcf`.                                                                                                          |
+| `vaf_histogram_allele_fraction`  | `auto`                | VAF source: `FORMAT_AF` (FORMAT/AF), `FORMAT_AD` (FORMAT/AD[alt] / FORMAT/DP) or `auto` (`FORMAT_AF` if the VCF header declares FORMAT/AF, else `FORMAT_AD`).       |
+| `vaf_histogram_bin_width`        | `0.05`                | Bin width, a fraction in (0, 1] (`0.05` = 5 % bins). Bins are [start, end); the last bin includes VAF 1.0.                                                           |
+| `vaf_histogram_sample_regex`     | not set (all columns) | Count only VCF columns whose sample name matches this Python regular expression, e.g. `-T$` for the tumor column of a tumor/normal VCF. Stops if a VCF has no match. |
+| `vaf_histogram_include_filtered` | `false`               | Also count records whose FILTER is not `PASS` or `.`.                                                                                                               |
+
+The VAF is determined as in [cio-abcd/variantinterpretation](https://github.com/cio-abcd/variantinterpretation) (`--allele_fraction`): from FORMAT/AF, or as FORMAT/AD of the ALT allele divided by FORMAT/DP. With `auto` the source is chosen per VCF from its `##FORMAT` header lines and written to `vaf_histogram_summary.tsv`. There is no silent fallback: the pipeline stops with an `ERROR` naming file, line, position and column if
+
+- the VCF header declares neither FORMAT/AF nor FORMAT/AD and FORMAT/DP (or not the fields of the forced source),
+- a counted variant has no value (`.` or missing) in the field(s) of the source, FORMAT/DP is 0, or the VAF is outside [0, 1] (e.g. AD[alt] > DP),
+- the VCF is malformed or cannot be read.
+
+Each ALT allele of a multi-allelic record counts as one variant (as after `bcftools norm -m-any`); ALT `.`, `*`, `<NON_REF>` and `<*>` are no variants and are skipped. If the VCF has FORMAT/GT, only the ALT alleles in the sample's genotype are counted; alleles not in the GT (hom-ref `0/0`, no-call `./.`, e.g. the normal column of a tumor/normal VCF) are skipped and counted in `alleles_not_in_genotype`. Records with FILTER `.` (no filters applied, e.g. FreeBayes or unfiltered GATK output) are counted like `PASS`; their number is logged as a `WARNING` and written to `records_filter_missing`. With one counted VCF column the histogram is named after the samplesheet sample, with several columns `<sample>_<column>`.
+
+Tested with synthetic VCFs in the formats of DRAGEN (tumor/normal, `GT:AD:AF:DP`), Mutect2 (tumor/normal, `GT:AD:AF:DP:F1R2:F2R1`) and FreeBayes (germline, `GT:DP:AD:RO:AO`, no FORMAT/AF) in `tests/fixtures/vaf_histogram/`, Python 3.12, MultiQC 1.35. A Strelka2-like VCF (no FORMAT/AF or AD) stops with an `ERROR`.
 
 ### Updating the pipeline
 

@@ -6,6 +6,7 @@
 include { MULTIQC                 } from '../modules/nf-core/multiqc/main'
 include { FASTQSCREEN_FASTQSCREEN } from '../modules/nf-core/fastqscreen/fastqscreen/main'
 include { DRAGEN_CNV_QC           } from '../modules/local/dragen_cnv_qc/main'
+include { VAF_HISTOGRAM           } from '../modules/local/vaf_histogram/main'
 include { FINGERPRINTCHECK        } from '../subworkflows/local/fingerprintcheck/main'
 include { samplesheetToList       } from 'plugin/nf-schema'
 include { paramsSummaryMap        } from 'plugin/nf-schema'
@@ -88,6 +89,20 @@ workflow EXOMEQC {
         ch_multiqc_files       = ch_multiqc_files.mix(DRAGEN_CNV_QC.out.metrics)
         ch_multiqc_files       = ch_multiqc_files.mix(DRAGEN_CNV_QC.out.json)
         ch_multiqc_files       = ch_multiqc_files.mix(DRAGEN_CNV_QC.out.plots)
+    }
+
+    if (params.enable_vaf_histogram) {
+        // the VCFs of the samplesheet column 'vcf', sorted by sample: [ [ samples ], [ vcfs ] ]
+        ch_vaf_vcfs = ch_samplesheet
+            .filter { meta, _reads -> meta.vcf }
+            .map { meta, _reads -> [ meta.id, file(meta.vcf.toString(), checkIfExists: true) ] }
+            .ifEmpty { error("--enable_vaf_histogram is set, but no sample in the samplesheet has a 'vcf'; add the column 'vcf' or set --enable_vaf_histogram false") }
+            .toSortedList { a, b -> a[0] <=> b[0] }
+            .map { pairs -> [ pairs.collect { pair -> pair[0] }, pairs.collect { pair -> pair[1] } ] }
+
+        VAF_HISTOGRAM(ch_vaf_vcfs)
+
+        ch_multiqc_files       = ch_multiqc_files.mix(VAF_HISTOGRAM.out.multiqc)
     }
 
     //

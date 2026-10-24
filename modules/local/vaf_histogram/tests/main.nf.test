@@ -1,0 +1,126 @@
+nextflow_process {
+
+    name "Test Process VAF_HISTOGRAM"
+    script "../main.nf"
+    process "VAF_HISTOGRAM"
+
+    tag "modules"
+    tag "modules_local"
+    tag "vaf_histogram"
+
+    // Synthetic VCFs of three callers, see tests/fixtures/vaf_histogram/generate_vaf_fixtures.py.
+    // The options are set as pipeline params, so they reach the script through
+    // conf/modules.config (ext.args), the same way as in a pipeline run.
+
+    test("DRAGEN, Mutect2, FreeBayes - auto VAF source, tumor columns") {
+
+        when {
+            params {
+                vaf_histogram_sample_regex = '-T$|^VAFG'
+            }
+            process {
+                """
+                def fixtures = "${projectDir}/tests/fixtures/vaf_histogram/vcf"
+                input[0] = [
+                    [ 'VAFG03', 'VAFT01', 'VAFT02' ],
+                    [
+                        file("\${fixtures}/VAFG03.freebayes.vcf.gz", checkIfExists: true),
+                        file("\${fixtures}/VAFT01.dragen.vcf.gz", checkIfExists: true),
+                        file("\${fixtures}/VAFT02.mutect2.vcf.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            // VAF source per histogram from the summary; non-empty bins of VAFG03
+            def summary = path(process.out.summary[0]).readLines()[1..-1].collect { line -> line.split('\t') }
+            def sources = summary.collectEntries { row -> [ row[0], row[3] ] }
+            def rows = path(process.out.tsv[0]).readLines()[1..-1].collect { line -> line.split('\t') }
+            def vafg03 = rows.findAll { row -> row[0] == 'VAFG03' && row[5] != '0' }.collectEntries { row -> [ row[3], row[5] as int ] }
+            assertAll(
+                { assert process.success },
+                { assert sources == [ VAFG03: 'FORMAT_AD', VAFT01: 'FORMAT_AF', VAFT02: 'FORMAT_AF' ] },
+                { assert vafg03 == [ '0.25': 1, '0.35': 2, '0.50': 1, '0.95': 1 ] },
+                { assert path(process.out.multiqc[0]).json.pconfig.data_labels.collect { label -> label.name } == [ 'VAFG03', 'VAFT01', 'VAFT02' ] },
+                { assert snapshot(
+                    process.out.tsv,
+                    process.out.summary,
+                    process.out.multiqc
+                ).match() }
+            )
+        }
+    }
+
+    test("FORMAT_AD forced, 0.1 bins, filtered records included") {
+
+        when {
+            params {
+                vaf_histogram_allele_fraction  = 'FORMAT_AD'
+                vaf_histogram_bin_width        = 0.1
+                vaf_histogram_sample_regex     = '-T$'
+                vaf_histogram_include_filtered = true
+            }
+            process {
+                """
+                input[0] = [ [ 'VAFT01' ], [ file("${projectDir}/tests/fixtures/vaf_histogram/vcf/VAFT01.dragen.vcf.gz", checkIfExists: true) ] ]
+                """
+            }
+        }
+
+        then {
+            def rows = path(process.out.tsv[0]).readLines()[1..-1].collect { line -> line.split('\t') }
+            def vaft01 = rows.findAll { row -> row[5] != '0' }.collectEntries { row -> [ row[3], row[5] as int ] }
+            assertAll(
+                { assert process.success },
+                { assert rows.size() == 10 },
+                // AD[alt]/DP of the tumor column; the weak_evidence record (9/30 = 0.3) is counted
+                { assert vaft01 == [ '0.10': 3, '0.20': 1, '0.30': 1, '0.50': 1, '0.90': 1 ] },
+                { assert path(process.out.summary[0]).readLines()[1].split('\t')[3] == 'FORMAT_AD' }
+            )
+        }
+    }
+
+    test("error - FORMAT_AF forced on a VCF without FORMAT/AF") {
+
+        when {
+            params {
+                vaf_histogram_allele_fraction = 'FORMAT_AF'
+            }
+            process {
+                """
+                input[0] = [ [ 'VAFG03' ], [ file("${projectDir}/tests/fixtures/vaf_histogram/vcf/VAFG03.freebayes.vcf.gz", checkIfExists: true) ] ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.failed },
+                { assert process.exitStatus == 1 },
+                { assert (process.stdout + process.stderr).any { line -> line.contains('ERROR:') && line.contains('--allele-fraction FORMAT_AF, but the header declares no FORMAT/AF') } }
+            )
+        }
+    }
+
+    test("auto VAF source - stub") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [ [ 'VAFT01' ], [ file("${projectDir}/tests/fixtures/vaf_histogram/vcf/VAFT01.dragen.vcf.gz", checkIfExists: true) ] ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out).match() }
+            )
+        }
+    }
+}
