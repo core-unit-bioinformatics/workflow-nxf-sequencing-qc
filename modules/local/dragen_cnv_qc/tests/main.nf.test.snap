@@ -1,0 +1,17 @@
+{
+    "thresholds from params - purity, PMAD": {
+        "content": [
+            [
+                "cnv-metrics.csv:md5,cd93a692f849b2e9d9351595b67c9144"
+            ],
+            [
+                "purcov_maxmodel_lineplot.json:md5,dd9583d46ab1bccc4a024b66f481eb9e"
+            ]
+        ],
+        "timestamp": "2026-10-24T12:48:03.472150607",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}

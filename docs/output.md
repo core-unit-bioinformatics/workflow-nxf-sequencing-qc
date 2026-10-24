@@ -33,6 +33,20 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 
 FastQ Screen is executed when `--enable_fastqscreen` is set. The `*_screen.txt` files are automatically collected by MultiQC.
 
+### DRAGEN CNV QC
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `cnv-metrics/`
+  - `cnv-metrics.csv`: one row per sample with `QC_STATUS` (`PASS`/`FAIL`), `QC_FAIL_REASONS` (`none`, or the failed checks separated by `;`, e.g. `EstimatedTumorPurity:0.25<0.3`) and the DRAGEN CNV metrics the checks use. Shown in the MultiQC section "CNV QC Metrics".
+  - `purcov_maxmodel_lineplot.json`: maximum log-likelihood per purity of the DRAGEN purity/coverage models, for the MultiQC section "CNV: Purity/Coverage Model".
+  - `karyoplot-<sample>-tn_mqc.png`, `karyoplot-<sample>-tumor.baf_mqc.png`: genome-wide tumor/normal ratio and tumor B-allele frequency.
+
+</details>
+
+The thresholds are described in [usage: DRAGEN CNV QC](usage.md#dragen-cnv-qc).
+
 ### MultiQC
 
 <details markdown="1">
