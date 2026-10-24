@@ -119,6 +119,27 @@ genome: 'GRCh37'
 
 You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-co.re/launch).
 
+### DRAGEN CNV QC
+
+With `--enable_cnvqc` (default `true`), `bin/analyze_cnv_metrics.R` reads the DRAGEN CNV output of all samples under `--dragen_dirs` (`*.cnv_metrics.csv`, `*.cnv.vcf.gz`, and if present `*.cnv.purity.coverage.models.tsv`, `*.cnv.excluded_intervals.bed.gz`, `*.tn.tsv.gz`, `*.tumor.baf.bedgraph.gz`) and sets a `QC_STATUS` of `PASS` or `FAIL` per sample.
+
+A sample always fails if DRAGEN found no purity model (`EstimatedTumorPurity=NA`) or `ModelSource` is missing. All other checks are optional: a check runs only if its threshold is given. A metric that is missing while its threshold is set fails the sample (`<metric>:MISSING`).
+
+| Parameter                       | Metric (source)                                              | Sample fails if  |
+| ------------------------------- | ------------------------------------------------------------ | ---------------- |
+| `pmad_max`                      | `PMAD` (cnv_metrics.csv)                                     | value > max      |
+| `coverage_mad_max`              | `Coverage MAD` (cnv_metrics.csv)                             | value > max      |
+| `outlier_baf_fraction_max`      | `OutlierBafFraction` (cnv_metrics.csv)                       | value > max      |
+| `diploid_coverage_min`          | `DiploidCoverage` (CNV VCF header)                           | value < min      |
+| `purity_min`, `purity_max`      | `EstimatedTumorPurity` (CNV VCF header), a fraction in [0, 1] | outside min..max |
+| `ploidy_min`, `ploidy_max`      | `OverallPloidy` (CNV VCF header)                             | outside min..max |
+| `post_norm_sigma_max`           | `Post-Normalization Bin Count Sigma` (cnv_metrics.csv)       | value > max      |
+| `num_segments_max`              | `Number of segments` (cnv_metrics.csv)                       | value > max      |
+| `filtered_records_relative_max` | `Number of filtered records (total)` percentage (cnv_metrics.csv) | value > max |
+| `homozygosity_index_max`        | `HomozygosityIndex` (CNV VCF header)                         | value > max      |
+
+The limits themselves pass (e.g. a purity of exactly `purity_min` passes). Purity is a fraction: `--purity_min 0.4` means 40 %. A value outside [0, 1] (e.g. `40`) stops the pipeline with an `ERROR`, as does any non-numeric threshold or an unknown option passed to the script.
+
 ### Updating the pipeline
 
 When you run the above command, Nextflow automatically pulls the pipeline code from GitHub and stores it as a cached version. When running the pipeline after this, it will always use the cached version if available - even if the pipeline has been updated since. To make sure that you're running the latest version of the pipeline, make sure that you regularly update the cached version of the pipeline:

@@ -1,0 +1,12 @@
+SEX GENOTYPER,,Normal,XY,99.50
+SEX GENOTYPER,,Tumor,XY,99.10
+CNV SUMMARY,,Number of passing amplifications,4,40.00
+CNV SUMMARY,,Number of passing deletions,6,60.00
+CNV SUMMARY,,Number of filtered records (total),3,23.08
+CNV SUMMARY,,Bin size,1000
+CNV SUMMARY,,PMAD,0.07
+CNV SUMMARY,,Coverage MAD,0.1200
+CNV SUMMARY,,Median Bin Count,150.00
+CNV SUMMARY,,OutlierBafFraction,0.0200
+CNV SUMMARY,,Post-Normalization Bin Count Sigma,0.2100
+CNV SUMMARY,,Number of segments,120

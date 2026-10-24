@@ -317,46 +317,60 @@
     ],
     "properties": {
         "enable_cnvqc": {
+            "description": "Run the DRAGEN CNV QC (bin/analyze_cnv_metrics.R) on the DRAGEN output in --dragen_dirs.",
             "type": "boolean",
             "default": true
         },
         "dragen_dirs": {
+            "description": "Directory with the DRAGEN output of all samples, searched recursively for the CNV files.",
             "type": "string"
         },
         "pmad_max": {
+            "description": "CNV QC: fail a sample if PMAD (cnv_metrics.csv) is above this value. Not checked if unset.",
             "type": "string"
         },
         "coverage_mad_max": {
+            "description": "CNV QC: fail a sample if Coverage MAD (cnv_metrics.csv) is above this value. Not checked if unset.",
             "type": "string"
         },
         "outlier_baf_fraction_max": {
+            "description": "CNV QC: fail a sample if OutlierBafFraction (cnv_metrics.csv) is above this value. Not checked if unset.",
             "type": "string"
         },
         "diploid_coverage_min": {
+            "description": "CNV QC: fail a sample if DiploidCoverage (CNV VCF header) is below this value. Not checked if unset.",
             "type": "string"
         },
         "purity_min": {
+            "description": "CNV QC: fail a sample if EstimatedTumorPurity (CNV VCF header) is below this value. A fraction in [0, 1], e.g. 0.4 for 40 %. Not checked if unset.",
             "type": "string"
         },
         "purity_max": {
+            "description": "CNV QC: fail a sample if EstimatedTumorPurity (CNV VCF header) is above this value. A fraction in [0, 1]. Not checked if unset.",
             "type": "string"
         },
         "ploidy_min": {
+            "description": "CNV QC: fail a sample if OverallPloidy (CNV VCF header) is below this value. Not checked if unset.",
             "type": "string"
         },
         "ploidy_max": {
+            "description": "CNV QC: fail a sample if OverallPloidy (CNV VCF header) is above this value. Not checked if unset.",
             "type": "string"
         },
         "post_norm_sigma_max": {
+            "description": "CNV QC: fail a sample if Post-Normalization Bin Count Sigma (cnv_metrics.csv) is above this value. Not checked if unset.",
             "type": "string"
         },
         "num_segments_max": {
+            "description": "CNV QC: fail a sample if the Number of segments (cnv_metrics.csv) is above this value. Not checked if unset.",
             "type": "string"
         },
         "filtered_records_relative_max": {
+            "description": "CNV QC: fail a sample if the percentage of filtered records (cnv_metrics.csv) is above this value. Not checked if unset.",
             "type": "string"
         },
         "homozygosity_index_max": {
+            "description": "CNV QC: fail a sample if HomozygosityIndex (CNV VCF header) is above this value. Not checked if unset.",
             "type": "string"
         }
     }
