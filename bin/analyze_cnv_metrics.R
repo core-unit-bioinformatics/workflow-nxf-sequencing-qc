@@ -227,6 +227,33 @@ parse_thresholds <- function(options) {
   thresholds
 }
 
+# Options accepted on the command line besides the threshold names.
+KNOWN_OPTIONS <- c(
+  "dragen",
+  "prefix",
+  "outfile",
+  "help",
+  "h",
+  "run-self-tests",
+  "plot-purcov-maxmodel",
+  "plot-purcov-allmodel"
+)
+
+# Stop on unknown options, e.g. a misspelled threshold such as --purity-min,
+# which would otherwise be ignored and leave that QC check silently disabled.
+validate_option_names <- function(options) {
+  allowed <- c(KNOWN_OPTIONS, names(DEFAULT_THRESHOLDS))
+  unknown <- setdiff(names(options), allowed)
+  if (length(unknown) > 0) {
+    stopf(
+      "Unknown option(s): %s. Allowed options: %s. Check the spelling (thresholds use underscores, e.g. --purity_min).",
+      paste0("--", unknown, collapse = ", "),
+      paste0("--", allowed, collapse = ", ")
+    )
+  }
+  invisible(TRUE)
+}
+
 write_plain_csv <- function(df, outfile) {
   if ("sample" %in% names(df)) {
     ordered_cols <- c("sample", setdiff(names(df), "sample"))
@@ -904,6 +931,52 @@ run_self_tests <- function() {
   stopifnot(qc$QC_STATUS[qc$sample == "S3"] == "FAIL")
   stopifnot(grepl("NoModelFound:EstimatedTumorPurity=NA", qc$QC_FAIL_REASONS[qc$sample == "S3"]))
 
+  # Purity range: below purity_min, at the boundary, above purity_max, NA.
+  purity_mock <- mock[rep(1, 5), , drop = FALSE]
+  purity_mock$sample <- c("P_LOW", "P_MIN", "P_OK", "P_HIGH", "P_NA")
+  purity_mock$EstimatedTumorPurity <- c("0.25", "0.3", "0.55", "0.95", "NA")
+  qc_pur <- evaluate_qc_status(purity_mock, parse_thresholds(list(purity_min = "0.3", purity_max = "0.9")))
+  status_of <- function(qc, s) qc$QC_STATUS[qc$sample == s]
+  reasons_of <- function(qc, s) qc$QC_FAIL_REASONS[qc$sample == s]
+  stopifnot(status_of(qc_pur, "P_LOW") == "FAIL")
+  stopifnot(reasons_of(qc_pur, "P_LOW") == "EstimatedTumorPurity:0.25<0.3")
+  stopifnot(status_of(qc_pur, "P_MIN") == "PASS")
+  stopifnot(status_of(qc_pur, "P_OK") == "PASS")
+  stopifnot(status_of(qc_pur, "P_HIGH") == "FAIL")
+  stopifnot(reasons_of(qc_pur, "P_HIGH") == "EstimatedTumorPurity:0.95>0.9")
+  stopifnot(status_of(qc_pur, "P_NA") == "FAIL")
+  stopifnot(grepl("NoModelFound:EstimatedTumorPurity=NA", reasons_of(qc_pur, "P_NA")))
+
+  # Without thresholds only the hard-coded NA check fails a sample.
+  qc_none <- evaluate_qc_status(purity_mock, parse_thresholds(list()))
+  stopifnot(identical(unname(qc_none$QC_STATUS), c("PASS", "PASS", "PASS", "PASS", "FAIL")))
+
+  # Thresholds given on the command line reach the QC evaluation.
+  cli <- parse_cli_args(c("--dragen", "in", "--prefix", "pref", "--purity_min", "0.3"))
+  validate_option_names(cli$options)
+  qc_cli <- evaluate_qc_status(purity_mock, parse_thresholds(cli$options))
+  stopifnot(status_of(qc_cli, "P_LOW") == "FAIL")
+
+  # Purity given in percent (40 instead of 0.4) is rejected.
+  percent_error <- tryCatch(
+    {
+      parse_thresholds(list(purity_min = "40"))
+      FALSE
+    },
+    error = function(e) TRUE
+  )
+  stopifnot(percent_error)
+
+  # A misspelled threshold option is rejected.
+  unknown_error <- tryCatch(
+    {
+      validate_option_names(list(dragen = "in", `purity-min` = "0.3"))
+      FALSE
+    },
+    error = function(e) TRUE
+  )
+  stopifnot(unknown_error)
+
   purity_models <- list(
     S1 = data.frame(purity = c(0.1, 0.2, 0.3), coverage = c(40, 40, 40), logl = c(-10, -5, -8)),
     S2 = data.frame(purity = c(0.1, 0.2), coverage = c(30, 30), logl = c(-2, -1))
@@ -921,6 +994,8 @@ run_self_tests <- function() {
 main <- function() {
   parsed <- parse_cli_args(commandArgs(trailingOnly = TRUE))
   options <- parsed$options
+  # reject unknown options before anything else is done
+  validate_option_names(options)
 
   if (!is.null(options$help) || !is.null(options$h)) {
     cat(usage(), "\n")
@@ -1005,4 +1080,11 @@ main <- function() {
   write_plain_csv(all_metrics_df, outfile = outfile_csv)
 }
 
-main()
+# Print errors as "ERROR: <message>" to stderr and exit with status 1.
+tryCatch(
+  main(),
+  error = function(e) {
+    message("ERROR: ", conditionMessage(e))
+    quit(save = "no", status = 1)
+  }
+)
