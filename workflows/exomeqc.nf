@@ -6,6 +6,7 @@
 include { MULTIQC                 } from '../modules/nf-core/multiqc/main'
 include { FASTQSCREEN_FASTQSCREEN } from '../modules/nf-core/fastqscreen/fastqscreen/main'
 include { DRAGEN_CNV_QC           } from '../modules/local/dragen_cnv_qc/main'
+include { VAF_HISTOGRAM           } from '../modules/local/vaf_histogram/main'
 include { FINGERPRINTCHECK        } from '../subworkflows/local/fingerprintcheck/main'
 include { samplesheetToList       } from 'plugin/nf-schema'
 include { paramsSummaryMap        } from 'plugin/nf-schema'
@@ -81,6 +82,22 @@ workflow EXOMEQC {
         ch_multiqc_files       = ch_multiqc_files.mix(DRAGEN_CNV_QC.out.metrics)
         ch_multiqc_files       = ch_multiqc_files.mix(DRAGEN_CNV_QC.out.json)
         ch_multiqc_files       = ch_multiqc_files.mix(DRAGEN_CNV_QC.out.plots)
+    }
+
+    if (params.enable_vaf_histogram) {
+        if (!params.dragen_dirs) {
+            error("Please provide --dragen_dirs when --enable_vaf_histogram is set")
+        }
+
+        // all small-variant VCFs under --dragen_dirs; stops if the glob matches nothing
+        def vaf_vcf_glob = "${params.dragen_dirs.toString().replaceAll('/+$', '')}/${params.vaf_histogram_vcf_glob}"
+        ch_vaf_vcfs = channel
+            .fromPath(vaf_vcf_glob, checkIfExists: true)
+            .collect()
+
+        VAF_HISTOGRAM(ch_vaf_vcfs)
+
+        ch_multiqc_files       = ch_multiqc_files.mix(VAF_HISTOGRAM.out.multiqc)
     }
 
     //

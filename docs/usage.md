@@ -149,6 +149,22 @@ A sample always fails if DRAGEN found no purity model (`EstimatedTumorPurity=NA`
 
 The limits themselves pass (e.g. a purity of exactly `purity_min` passes). Purity is a fraction: `--purity_min 0.4` means 40 %. A value outside [0, 1] (e.g. `40`) stops the pipeline with an `ERROR`, as does any non-numeric threshold or an unknown option passed to the script.
 
+### VAF histogram
+
+With `--enable_vaf_histogram` (default `true`), `bin/vaf_histogram.py` counts the variants per variant allele fraction (VAF) bin for every sample column of the small-variant VCFs under `--dragen_dirs` and adds the section "Variant allele fraction" to the MultiQC report: one histogram per sample (switch with the buttons above the plot), x-axis VAF, y-axis number of variants.
+
+| Parameter                        | Default                   | Meaning                                                                                                                                       |
+| -------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enable_vaf_histogram`           | `true`                    | Run the VAF histogram; requires `--dragen_dirs`.                                                                                              |
+| `vaf_histogram_bin_width`        | `0.05`                    | Bin width, a fraction in (0, 1] (`0.05` = 5 % bins). Bins are [start, end); the last bin includes VAF 1.0.                                     |
+| `vaf_histogram_vcf_glob`         | `**.hard-filtered.vcf.gz` | VCFs to count, relative to `--dragen_dirs` (DRAGEN small-variant calls). The pipeline stops if no file matches.                               |
+| `vaf_histogram_sample_regex`     | not set (all samples)     | Count only VCF samples whose name matches this Python regular expression, e.g. `-T$` for tumor samples named `<id>-T`. Stops if a VCF has no matching sample. |
+| `vaf_histogram_include_filtered` | `false`                   | Also count records whose FILTER is not `PASS`.                                                                                                |
+
+VAF per ALT allele is FORMAT/AF of the sample. If AF is missing, the VAF is computed from FORMAT/AD (alt / sum of AD); this is logged as `WARNING` and counted in `vaf_histogram_summary.tsv`, as are alleles without any VAF (skipped). Each ALT allele of a multi-allelic record counts as one variant. A sample name that occurs in more than one VCF, a VAF outside [0, 1] or a malformed VCF stops the pipeline with an `ERROR`.
+
+Tested with synthetic DRAGEN-like tumor/normal VCFs (`tests/fixtures/vaf_histogram/`, FORMAT `GT:AD:AF:DP`), Python 3.12, MultiQC 1.35.
+
 ### Updating the pipeline
 
 When you run the above command, Nextflow automatically pulls the pipeline code from GitHub and stores it as a cached version. When running the pipeline after this, it will always use the cached version if available - even if the pipeline has been updated since. To make sure that you're running the latest version of the pipeline, make sure that you regularly update the cached version of the pipeline:

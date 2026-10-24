@@ -106,6 +106,45 @@
                 }
             }
         },
+        "vaf_histogram_options": {
+            "title": "VAF histogram options",
+            "type": "object",
+            "fa_icon": "fas fa-chart-bar",
+            "description": "Options for the variant allele fraction (VAF) histogram in the MultiQC report.",
+            "properties": {
+                "enable_vaf_histogram": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Add a histogram of the variant allele fractions per sample to the MultiQC report.",
+                    "help_text": "Reads the small-variant VCFs under `--dragen_dirs` (see `--vaf_histogram_vcf_glob`), which is then required."
+                },
+                "vaf_histogram_bin_width": {
+                    "type": "number",
+                    "default": 0.05,
+                    "exclusiveMinimum": 0,
+                    "maximum": 1,
+                    "description": "Width of the VAF bins, a fraction in (0, 1], e.g. 0.05 for 5 % bins.",
+                    "help_text": "Bins are [start, end); the last bin includes VAF 1.0 and is cut at 1 if 1 is not a multiple of the width."
+                },
+                "vaf_histogram_vcf_glob": {
+                    "type": "string",
+                    "default": "**.hard-filtered.vcf.gz",
+                    "description": "Glob pattern, relative to `--dragen_dirs`, of the VCFs to count.",
+                    "help_text": "The pipeline stops if no file matches. Each VCF sample column gets its own histogram; a sample name must not occur in more than one VCF."
+                },
+                "vaf_histogram_sample_regex": {
+                    "type": "string",
+                    "pattern": "^[^']+$",
+                    "description": "Count only VCF samples whose name matches this regular expression (Python syntax), e.g. `-T$` for the tumor samples. Default: all samples.",
+                    "help_text": "The pipeline stops if the regex matches no sample of a VCF. Must not contain a single quote."
+                },
+                "vaf_histogram_include_filtered": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Also count variants whose FILTER is not PASS. Default: only PASS variants."
+                }
+            }
+        },
         "reference_genome_options": {
             "title": "Reference genome options",
             "type": "object",
@@ -311,6 +350,9 @@
         },
         {
             "$ref": "#/$defs/fastqscreen_options"
+        },
+        {
+            "$ref": "#/$defs/vaf_histogram_options"
         },
         {
             "$ref": "#/$defs/reference_genome_options"

@@ -1,0 +1,87 @@
+nextflow_pipeline {
+
+    name "Test pipeline - VAF histogram"
+    script "../main.nf"
+    tag "pipeline"
+    tag "vaf_histogram"
+
+    // Only the VAF histogram and MultiQC run; the other QC steps are switched off.
+    // The samplesheet and the MultiQC input list are written into the test's
+    // output directory, because their paths must be absolute.
+
+    test("VAF histogram section in the MultiQC report") {
+
+        when {
+            params {
+                def fixtures = new File("${projectDir}/tests/fixtures/vaf_histogram")
+                def samplesheet = new File("${outputDir}/samplesheet.csv")
+                samplesheet.parentFile.mkdirs()
+                samplesheet.text = "sample\nVAFT01\n"
+                // an empty directory, so MultiQC finds only the pipeline's own files
+                def multiqc_dir = new File("${outputDir}/multiqc_inputs")
+                multiqc_dir.mkdirs()
+                def multiqc_list = new File("${outputDir}/multiqc_inputs.csv")
+                multiqc_list.text = "paths\n${multiqc_dir}\n"
+
+                input                      = samplesheet.path
+                multiqc_inputs             = multiqc_list.path
+                outdir                     = "${outputDir}/results"
+                // the test profile sets an iGenomes genome, which is not needed here
+                genome                     = null
+                igenomes_ignore            = true
+                enable_fastqscreen         = false
+                enable_fingerprintcheck    = false
+                enable_cnvqc               = false
+                dragen_dirs                = "${fixtures}/dragen/"
+                vaf_histogram_sample_regex = '-T$'
+            }
+        }
+
+        then {
+            def multiqc_data = new File("${outputDir}/results/multiqc/Exome-Sequencing_multiqc_report_data")
+            assertAll(
+                { assert workflow.success },
+                { assert new File("${outputDir}/results/vaf-histogram/vaf_histogram.tsv").exists() },
+                { assert new File("${outputDir}/results/vaf-histogram/vaf_histogram_summary.tsv").exists() },
+                // MultiQC parsed one dataset per tumor sample
+                { assert multiqc_data.list().findAll { name -> name.startsWith('multiqc_exomeqc_vaf_histogram_plot') }.size() == 2 },
+                { assert path("${outputDir}/results/multiqc/Exome-Sequencing_multiqc_report.html").text.contains('Variant allele fraction') }
+            )
+        }
+    }
+
+    test("error - no VCF matches the glob") {
+
+        when {
+            params {
+                def fixtures = new File("${projectDir}/tests/fixtures/vaf_histogram")
+                def samplesheet = new File("${outputDir}/samplesheet.csv")
+                samplesheet.parentFile.mkdirs()
+                samplesheet.text = "sample\nVAFT01\n"
+                // an empty directory, so MultiQC finds only the pipeline's own files
+                def multiqc_dir = new File("${outputDir}/multiqc_inputs")
+                multiqc_dir.mkdirs()
+                def multiqc_list = new File("${outputDir}/multiqc_inputs.csv")
+                multiqc_list.text = "paths\n${multiqc_dir}\n"
+
+                input                   = samplesheet.path
+                multiqc_inputs          = multiqc_list.path
+                outdir                  = "${outputDir}/results"
+                genome                  = null
+                igenomes_ignore         = true
+                enable_fastqscreen      = false
+                enable_fingerprintcheck = false
+                enable_cnvqc            = false
+                dragen_dirs             = "${fixtures}/dragen"
+                vaf_histogram_vcf_glob  = '**.no-such-file.vcf.gz'
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.failed },
+                { assert (workflow.stdout + workflow.stderr).any { line -> line.contains('no-such-file.vcf.gz') } }
+            )
+        }
+    }
+}

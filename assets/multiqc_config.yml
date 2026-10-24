@@ -59,6 +59,8 @@ report_section_order:
     order: 880
   exomeqc_purcov_maxmodel:
     order: 870
+  exomeqc_vaf_histogram:
+    order: 860
   cio-abcd-variantinterpretation-methods-description:
     order: -10
   cio-abcd-variantinterpretation-summary:
