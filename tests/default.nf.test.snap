@@ -15,8 +15,13 @@
                     "bwamem2": "2.2.1",
                     "samtools": "1.22.1"
                 },
+                "CHECK_FINGERPRINT_DATABASE": {
+                    "python": "3.12.15",
+                    "pyvcf3": "1.0.4"
+                },
                 "FINGERPRINT_DATABASE_REPORT": {
-                    "python": "3.8.3"
+                    "python": "3.12.15",
+                    "pyvcf3": "1.0.4"
                 },
                 "PICARD_CREATESEQUENCEDICTIONARY": {
                     "picard": "3.5.0"
@@ -44,12 +49,14 @@
                 "fingerprintcheck",
                 "fingerprintcheck/crosscheck.crosscheck_metrics.txt",
                 "fingerprintcheck/database",
-                "fingerprintcheck/database/exomeqc_fingerprint_database.vcf.gz",
-                "fingerprintcheck/database/exomeqc_fingerprint_database.vcf.gz.tbi",
                 "fingerprintcheck/database/fingerprint_database.crosscheck_metrics.txt",
+                "fingerprintcheck/database/fingerprint_database_fingerprints.tsv",
                 "fingerprintcheck/database/fingerprint_database_matches.tsv",
                 "fingerprintcheck/database/fingerprint_database_matches_mqc.tsv",
+                "fingerprintcheck/database/fingerprint_database_overview_mqc.html",
                 "fingerprintcheck/database/fingerprint_database_summary.tsv",
+                "fingerprintcheck/database/previous_database_check.tsv",
+                "fingerprintcheck/database/previous_database_samples.tsv",
                 "fingerprintcheck/fingerprints",
                 "fingerprintcheck/fingerprints/SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz",
                 "fingerprintcheck/fingerprints/SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz.tbi",
@@ -92,18 +99,47 @@
                 "samtools/SYN004_3-N_20260201_LH00001_0002_BFIXTURE02.aligned.bam.bai"
             ],
             [
+                "fingerprint_database_fingerprints.tsv:md5,b11184210759131fa791048c38137da8",
                 "fingerprint_database_matches.tsv:md5,0fc5481774ff56a43d0fe1a5907ac20e",
-                "fingerprint_database_matches_mqc.tsv:md5,9c99e6dfd6e8c300b34559d1e86eef51",
-                "fingerprint_database_summary.tsv:md5,840f80bb88e068800e57eeb91c70ede8",
+                "fingerprint_database_matches_mqc.tsv:md5,62af41a91d7564eb3c1613948854b6fa",
+                "previous_database_check.tsv:md5,00b5156e7d049ef3f7590b389d56f57e",
+                "previous_database_samples.tsv:md5,2167150c70b258bd6b9c02072494abc1",
                 "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
                 "multiqc_exomeqc_fingerprint_database_table.txt:md5,7a18846dab68c281a60d82e9482c20d8",
                 "multiqc_general_stats.txt:md5,8396a8cdb0229b6ef8c86b3ab805ea43",
-                "multiqc_software_versions.txt:md5,76160b569d163484fbb3b52bc2bbea5e",
+                "multiqc_software_versions.txt:md5,86103a27f60786030c75c6841a901a4d",
                 "picard-crosscheckfingerprints-sample-table.txt:md5,2eba1ad31f71f6fa36353e01e79b5902",
                 "picard_MarkIlluminaAdapters_histogram.txt:md5,d41d8cd98f00b204e9800998ecf8427e",
                 "picard_MeanQualityByCycle_histogram.txt:md5,d41d8cd98f00b204e9800998ecf8427e",
                 "picard_MeanQualityByCycle_histogram_1.txt:md5,d41d8cd98f00b204e9800998ecf8427e",
                 "picard_QualityScoreDistribution_histogram.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+            ],
+            [
+                "metric\tvalue",
+                "lod_threshold\t5",
+                "haplotype_map_file\thaplotype_map.txt",
+                "haplotype_map_snps\t100",
+                "haplotype_map_blocks\t100",
+                "run_samples\t4",
+                "run_samples_suitable\t4",
+                "run_samples_insufficient\t0",
+                "run_samples_no_coverage\t0",
+                "database_given\tyes",
+                "database_file\tprevious_database.vcf.gz",
+                "database_compression\tbgzip",
+                "previous_database_samples\t2",
+                "replaced_fingerprints\t0",
+                "checked_database_samples\t2",
+                "checked_database_runs\t1",
+                "database_samples\t6",
+                "comparisons\t8",
+                "unexpected_match\t1",
+                "unexpected_mismatch\t1",
+                "expected_match\t1",
+                "inconclusive_same_sample\t0",
+                "inconclusive_other_sample\t0",
+                "expected_mismatch\t5",
+                "reported_comparisons\t3"
             ],
             [
                 "SYN001_3-N SYN001_3-N 45.379291",
@@ -124,7 +160,7 @@
                 "SYN004_3-N SYN004_3-N 45.550181"
             ]
         ],
-        "timestamp": "2026-10-23T17:18:10.437324418",
+        "timestamp": "2026-10-24T12:53:29.61797773",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

@@ -26,6 +26,10 @@
 
   > Picard Toolkit. 2019. Broad Institute, GitHub Repository. https://broadinstitute.github.io/picard/; Broad Institute. CrosscheckFingerprints, ExtractFingerprint, CreateSequenceDictionary.
 
+- [PyVCF3](https://github.com/dridk/PyVCF3)
+
+  > PyVCF3: Variant Call Format (VCF) parser for Python 3, maintained fork of PyVCF (J. Casbon et al.). GitHub Repository. https://github.com/dridk/PyVCF3 (BSD-3-Clause).
+
 - [SAMtools](https://pubmed.ncbi.nlm.nih.gov/33590861/)
 
   > Danecek P, Bonfield JK, Liddle J, Marshall J, Ohan V, Pollard MO, Whitwham A, Keane T, McCarthy SA, Davies RM, Li H. Twelve years of SAMtools and BCFtools. Gigascience. 2021 Feb 16;10(2):giab008. doi: 10.1093/gigascience/giab008. PubMed PMID: 33590861.

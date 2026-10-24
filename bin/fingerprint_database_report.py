@@ -1,11 +1,24 @@
 #!/usr/bin/env python3
-"""Report fingerprint matches of this run's samples with the fingerprint database.
+"""Report the fingerprint check of this run and its matches with the database.
 
-Reads the Picard CrosscheckFingerprints metrics of this run's fingerprints
-(INPUT, CROSSCHECK_BY SAMPLE) against the updated fingerprint database
-(SECOND_INPUT, CROSSCHECK_MODE CHECK_ALL_OTHERS) and keeps only comparisons
-with database samples from other sequencing runs. Comparisons among this run's
-samples are left to the crosscheck heatmap and are dropped here.
+Inputs are the outputs of the FINGERPRINTCHECK subworkflow:
+
+    - this run's samples (fingerprint_id, sample, runid, bam) and their
+      fingerprint VCFs (Picard ExtractFingerprint), read with PyVCF and
+      checked against the haplotype map
+    - the crosscheck of this run's BAMs with each other (Picard
+      CrosscheckFingerprints, CROSSCHECK_BY FILE): its self-comparison LOD
+      per BAM tells how informative the fingerprint is
+    - if a fingerprint database was given: the result of its check against
+      the haplotype map (which fingerprints are kept, which are replaced by
+      this run) and the crosscheck of this run's fingerprints against the
+      kept fingerprints (INPUT this run, SECOND_INPUT the database,
+      CROSSCHECK_BY SAMPLE, CROSSCHECK_MODE CHECK_ALL_OTHERS)
+    - the updated database (header only: its sample names)
+
+The database is checked before this run's fingerprints are added, so a sample
+never meets its own new fingerprint there; comparisons among this run's
+samples are covered by the crosscheck heatmap.
 
 Fingerprint IDs have the form <sample>@<runid>. Two fingerprints are
 "expected" to match when their sample IDs are identical (the same sample
@@ -24,13 +37,22 @@ Reported (table and MultiQC section): UNEXPECTED_MATCH, EXPECTED_MATCH,
 UNEXPECTED_MISMATCH and expected INCONCLUSIVE comparisons. EXPECTED_MISMATCH
 and INCONCLUSIVE comparisons between different sample IDs are only counted.
 
+Fingerprint of each sample of this run:
+
+    NO_COVERAGE    no read at any haplotype block of the map
+    INSUFFICIENT   self-comparison LOD < T: even a comparison with another
+                   fingerprint of the same person could not reach a match
+    SUITABLE       self-comparison LOD >= T
+
 No existing tool covers this: Picard has no notion of a sample sequenced in
 several runs, and MultiQC's Picard module would show every database sample in
 the heatmap.
 
 Outputs (in the working directory, <prefix> from --prefix):
     <prefix>_matches.tsv          reported comparisons, all columns
+    <prefix>_fingerprints.tsv     fingerprint of each sample of this run
     <prefix>_summary.tsv          counts (metric, value)
+    <prefix>_overview_mqc.html    MultiQC section: overview of the check
     <prefix>_matches_mqc.tsv      MultiQC custom content table, or
     <prefix>_matches_mqc.html     MultiQC custom content note when nothing
                                   is reported
@@ -38,16 +60,26 @@ Outputs (in the working directory, <prefix> from --prefix):
 
 import argparse
 import csv
-import gzip
 import html
-import re
 import sys
 from pathlib import Path
 
-ID_SEPARATOR = "@"
-# sample and runid are restricted to the CUBI file name characters
-NAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
-RUN_SAMPLES_COLUMNS = ["fingerprint_id", "sample", "runid"]
+# the database check script lives next to this script in bin/
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from check_fingerprint_database import (
+    ID_SEPARATOR,
+    check_vcf_against_map,
+    fail,
+    info,
+    read_haplotype_map,
+    read_vcf_samples,
+    split_fingerprint_id,
+    warning,
+)
+
+RUN_SAMPLES_COLUMNS = ["fingerprint_id", "sample", "runid", "bam"]
+DATABASE_SAMPLES_COLUMNS = ["fingerprint_id", "sample", "runid", "action"]
+DATABASE_ACTIONS = {"keep", "replace"}
 REQUIRED_METRIC_COLUMNS = [
     "LEFT_SAMPLE",
     "RIGHT_SAMPLE",
@@ -55,6 +87,7 @@ REQUIRED_METRIC_COLUMNS = [
     "LOD_SCORE_TUMOR_NORMAL",
     "LOD_SCORE_NORMAL_TUMOR",
 ]
+REQUIRED_RUN_METRIC_COLUMNS = ["LEFT_FILE", "RIGHT_FILE", "LOD_SCORE"]
 REPORTED_STATUSES = [
     "UNEXPECTED_MATCH",
     "UNEXPECTED_MISMATCH",
@@ -72,116 +105,89 @@ MATCH_COLUMNS = [
     "lod_score_tumor_normal",
     "lod_score_normal_tumor",
 ]
+FINGERPRINT_COLUMNS = [
+    "fingerprint_id",
+    "sample",
+    "runid",
+    "haplotype_blocks",
+    "blocks_with_reads",
+    "fraction_blocks_with_reads",
+    "mean_depth",
+    "self_lod",
+    "status",
+]
 MQC_ID = "exomeqc_fingerprint_database"
+MQC_OVERVIEW_ID = "exomeqc_fingerprint_overview"
 
 
-def info(message):
-    print(f"INFO: {message}", file=sys.stderr)
-
-
-def warning(message):
-    print(f"WARNING: {message}", file=sys.stderr)
-
-
-def fail(message):
-    print(f"ERROR: {message}", file=sys.stderr)
-    sys.exit(1)
-
-
-def split_fingerprint_id(fingerprint_id, source):
-    """Split <sample>@<runid> into (sample, runid), failing on any other form."""
-    parts = fingerprint_id.split(ID_SEPARATOR)
-    # exactly one separator, and both parts made of allowed characters
-    if len(parts) != 2 or not all(NAME_PATTERN.match(part) for part in parts):
-        fail(
-            f"{source}: fingerprint ID '{fingerprint_id}' is not of the form "
-            f"<sample>{ID_SEPARATOR}<runid> with sample and runid made of [A-Za-z0-9._-]; "
-            "fingerprint databases must be created by exomeqc"
-        )
-    return parts[0], parts[1]
+def read_tsv(path, columns):
+    """Read a TSV whose header must be exactly `columns`; return (line, row) pairs."""
+    with open(path, newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        if reader.fieldnames != columns:
+            fail(f"{path}: expected header {columns}, observed {reader.fieldnames}")
+        return list(enumerate(reader, start=2))
 
 
 def read_run_samples(path):
-    """Read this run's samples (fingerprint_id, sample, runid) as an ordered dict."""
-    with open(path, newline="") as handle:
-        reader = csv.DictReader(handle, delimiter="\t")
-        # the header must list exactly the expected columns
-        if reader.fieldnames != RUN_SAMPLES_COLUMNS:
+    """Read this run's samples as {fingerprint_id: (sample, runid, bam)}."""
+    samples = {}
+    bams = set()
+    for line_number, row in read_tsv(path, RUN_SAMPLES_COLUMNS):
+        fingerprint_id = row["fingerprint_id"]
+        sample, runid = split_fingerprint_id(
+            fingerprint_id, f"{path} line {line_number}"
+        )
+        # the ID must agree with the sample and runid columns of the same row
+        if (sample, runid) != (row["sample"], row["runid"]):
             fail(
-                f"{path}: expected header {RUN_SAMPLES_COLUMNS}, observed {reader.fieldnames}"
+                f"{path} line {line_number}: fingerprint_id '{fingerprint_id}' does not match "
+                f"sample '{row['sample']}' and runid '{row['runid']}'"
             )
-        samples = {}
-        for line_number, row in enumerate(reader, start=2):
-            fingerprint_id = row["fingerprint_id"]
-            sample, runid = split_fingerprint_id(
-                fingerprint_id, f"{path} line {line_number}"
+        # every fingerprint ID and every BAM may appear only once in the run
+        if fingerprint_id in samples:
+            fail(
+                f"{path} line {line_number}: duplicate fingerprint_id '{fingerprint_id}'"
             )
-            # the ID must agree with the sample and runid columns of the same row
-            if (sample, runid) != (row["sample"], row["runid"]):
-                fail(
-                    f"{path} line {line_number}: fingerprint_id '{fingerprint_id}' does not match "
-                    f"sample '{row['sample']}' and runid '{row['runid']}'"
-                )
-            # every fingerprint ID may appear only once in the run
-            if fingerprint_id in samples:
-                fail(
-                    f"{path} line {line_number}: duplicate fingerprint_id '{fingerprint_id}'"
-                )
-            samples[fingerprint_id] = (sample, runid)
+        if not row["bam"] or row["bam"] in bams:
+            fail(f"{path} line {line_number}: empty or duplicate bam '{row['bam']}'")
+        bams.add(row["bam"])
+        samples[fingerprint_id] = (sample, runid, row["bam"])
     if not samples:
         fail(f"{path}: no samples listed")
     info(f"read {len(samples)} samples of this run from {path}")
     return samples
 
 
-def read_vcf_samples(path):
-    """Return the sample names of a (b)gzipped VCF from its #CHROM header line."""
-    try:
-        with gzip.open(path, "rt") as handle:
-            for line in handle:
-                # the column header line ends the VCF header and lists the samples
-                if line.startswith("#CHROM"):
-                    return line.rstrip("\n").split("\t")[9:]
-                # a data line before #CHROM means the header is broken
-                if not line.startswith("##"):
-                    break
-    except (OSError, EOFError) as error:
-        fail(
-            f"{path}: cannot read as gzipped VCF ({error}); provide the .vcf.gz written by exomeqc"
-        )
-    fail(f"{path}: no #CHROM header line found; provide the .vcf.gz written by exomeqc")
+def read_database_samples(path, run_samples):
+    """Read the database check result; return (kept, replaced) fingerprint ID lists."""
+    kept, replaced = [], []
+    for line_number, row in read_tsv(path, DATABASE_SAMPLES_COLUMNS):
+        fingerprint_id = row["fingerprint_id"]
+        split_fingerprint_id(fingerprint_id, f"{path} line {line_number}")
+        if row["action"] not in DATABASE_ACTIONS:
+            fail(
+                f"{path} line {line_number}: action must be one of {sorted(DATABASE_ACTIONS)}, "
+                f"observed '{row['action']}'"
+            )
+        # exactly the fingerprints with an ID of this run are replaced
+        if (row["action"] == "replace") != (fingerprint_id in run_samples):
+            fail(
+                f"{path} line {line_number}: action '{row['action']}' for '{fingerprint_id}' "
+                "does not agree with the samples of this run"
+            )
+        (replaced if row["action"] == "replace" else kept).append(fingerprint_id)
+    if len(set(kept + replaced)) != len(kept + replaced):
+        fail(f"{path}: duplicate fingerprint IDs")
+    info(
+        f"read {len(kept) + len(replaced)} fingerprints of the given database from {path}: "
+        f"{len(kept)} kept, {len(replaced)} replaced"
+    )
+    return kept, replaced
 
 
-def read_previous_database(path, run_samples):
-    """Read the previous database's IDs and report those replaced by this run."""
-    previous = read_vcf_samples(path)
-    for fingerprint_id in previous:
-        split_fingerprint_id(fingerprint_id, f"{path} (sample in VCF header)")
-    # sample names in a VCF header must be unique
-    duplicates = sorted({s for s in previous if previous.count(s) > 1})
-    if duplicates:
-        fail(f"{path}: duplicate sample names in the database: {', '.join(duplicates)}")
-    # IDs of this run already present in the database are replaced by the new fingerprints
-    replaced = [s for s in previous if s in run_samples]
-    info(f"read {len(previous)} fingerprints from the previous database {path}")
-    if replaced:
-        warning(
-            f"{len(replaced)} fingerprint(s) of this run were already in the previous database "
-            f"and were replaced by the new fingerprints: {', '.join(replaced)}"
-        )
-    return previous, replaced
-
-
-def parse_lod(value, path, line_number, column):
-    """Parse a LOD score, failing with the location on a non-numeric value."""
-    try:
-        return float(value)
-    except ValueError:
-        fail(f"{path} line {line_number}: column {column} is not a number: '{value}'")
-
-
-def read_crosscheck_metrics(path):
-    """Read the CrosscheckMetric rows of a Picard CrosscheckFingerprints output."""
+def read_metric_table(path, required_columns):
+    """Read the rows of a Picard metrics file as dicts, with their line numbers."""
     with open(path) as handle:
         lines = handle.read().splitlines()
     # the metrics table starts right after the '## METRICS CLASS' line
@@ -194,44 +200,135 @@ def read_crosscheck_metrics(path):
     if header_index >= len(lines):
         fail(f"{path}: metrics header line missing after '## METRICS CLASS'")
     header = lines[header_index].split("\t")
-    missing = [c for c in REQUIRED_METRIC_COLUMNS if c not in header]
+    missing = [c for c in required_columns if c not in header]
     if missing:
         fail(
             f"{path}: missing column(s) {', '.join(missing)} (observed: {', '.join(header)})"
         )
     rows = []
-    for offset, line in enumerate(lines[header_index + 1 :], start=header_index + 2):
+    for line_number, line in enumerate(
+        lines[header_index + 1 :], start=header_index + 2
+    ):
         # the metrics table ends at the first blank line
         if not line.strip():
             break
         fields = line.split("\t")
         if len(fields) != len(header):
             fail(
-                f"{path} line {offset}: expected {len(header)} columns, observed {len(fields)}"
+                f"{path} line {line_number}: expected {len(header)} columns, observed {len(fields)}"
             )
-        record = dict(zip(header, fields))
+        rows.append((line_number, dict(zip(header, fields))))
+    if not rows:
+        fail(f"{path}: no comparisons in the metrics table")
+    info(f"read {len(rows)} comparisons from {path}")
+    return rows
+
+
+def parse_lod(value, path, line_number, column):
+    """Parse a LOD score, failing with the location on a non-numeric value."""
+    try:
+        return float(value)
+    except ValueError:
+        fail(f"{path} line {line_number}: column {column} is not a number: '{value}'")
+
+
+def read_crosscheck_metrics(path):
+    """Read the comparisons of this run against the database."""
+    rows = []
+    for line_number, record in read_metric_table(path, REQUIRED_METRIC_COLUMNS):
         rows.append(
             {
                 "left": record["LEFT_SAMPLE"],
                 "right": record["RIGHT_SAMPLE"],
-                "lod_score": parse_lod(record["LOD_SCORE"], path, offset, "LOD_SCORE"),
-                "lod_score_tumor_normal": parse_lod(
-                    record["LOD_SCORE_TUMOR_NORMAL"],
-                    path,
-                    offset,
-                    "LOD_SCORE_TUMOR_NORMAL",
-                ),
-                "lod_score_normal_tumor": parse_lod(
-                    record["LOD_SCORE_NORMAL_TUMOR"],
-                    path,
-                    offset,
-                    "LOD_SCORE_NORMAL_TUMOR",
+                **{
+                    column.lower(): parse_lod(record[column], path, line_number, column)
+                    for column in REQUIRED_METRIC_COLUMNS[2:]
+                },
+            }
+        )
+    return rows
+
+
+def read_self_lods(path, run_samples):
+    """Return {fingerprint_id: LOD} of each BAM compared with itself in the run crosscheck."""
+    # CROSSCHECK_BY FILE: the file name identifies the sample of this run
+    by_bam = {
+        bam: fingerprint_id for fingerprint_id, (_s, _r, bam) in run_samples.items()
+    }
+    self_lods = {}
+    for line_number, record in read_metric_table(path, REQUIRED_RUN_METRIC_COLUMNS):
+        # Picard writes file URIs; compare their file names
+        left = record["LEFT_FILE"].rsplit("/", 1)[-1]
+        right = record["RIGHT_FILE"].rsplit("/", 1)[-1]
+        if left != right:
+            continue
+        if left not in by_bam:
+            fail(f"{path} line {line_number}: file '{left}' is not a BAM of this run")
+        fingerprint_id = by_bam[left]
+        if fingerprint_id in self_lods:
+            fail(f"{path} line {line_number}: self-comparison of '{left}' listed twice")
+        self_lods[fingerprint_id] = parse_lod(
+            record["LOD_SCORE"], path, line_number, "LOD_SCORE"
+        )
+    missing = [run_samples[f][2] for f in run_samples if f not in self_lods]
+    if missing:
+        fail(f"{path}: no self-comparison for BAM(s) {', '.join(missing)}")
+    return self_lods
+
+
+def read_fingerprints(paths, run_samples, haplotype_map):
+    """Check this run's fingerprint VCFs against the map; return coverage per sample."""
+    coverage = {}
+    for path in paths:
+        result = check_vcf_against_map(path, haplotype_map)
+        # each fingerprint VCF holds exactly one sample of this run
+        if len(result["samples"]) != 1 or result["samples"][0] not in run_samples:
+            fail(
+                f"{path}: expected one sample of this run, observed {result['samples']}"
+            )
+        fingerprint_id = result["samples"][0]
+        if fingerprint_id in coverage:
+            fail(f"{path}: second fingerprint VCF of '{fingerprint_id}'")
+        coverage[fingerprint_id] = (
+            result["sites"],
+            result["blocks_with_reads"][fingerprint_id],
+            result["depth_sum"][fingerprint_id],
+        )
+    missing = [f for f in run_samples if f not in coverage]
+    if missing:
+        fail(f"no fingerprint VCF for sample(s) of this run: {', '.join(missing)}")
+    return coverage
+
+
+def fingerprint_status(blocks_with_reads, self_lod, threshold):
+    """Classify how informative a fingerprint is."""
+    if blocks_with_reads == 0:
+        return "NO_COVERAGE"
+    if self_lod < threshold:
+        return "INSUFFICIENT"
+    return "SUITABLE"
+
+
+def build_fingerprint_rows(run_samples, coverage, self_lods, threshold):
+    """One row per sample of this run with its coverage, self LOD and status."""
+    rows = []
+    for fingerprint_id, (sample, runid, _bam) in sorted(run_samples.items()):
+        blocks, with_reads, depth_sum = coverage[fingerprint_id]
+        rows.append(
+            {
+                "fingerprint_id": fingerprint_id,
+                "sample": sample,
+                "runid": runid,
+                "haplotype_blocks": blocks,
+                "blocks_with_reads": with_reads,
+                "fraction_blocks_with_reads": f"{with_reads / blocks:.3f}",
+                "mean_depth": f"{depth_sum / blocks:.1f}",
+                "self_lod": f"{self_lods[fingerprint_id]:.2f}",
+                "status": fingerprint_status(
+                    with_reads, self_lods[fingerprint_id], threshold
                 ),
             }
         )
-    if not rows:
-        fail(f"{path}: no comparisons in the metrics table")
-    info(f"read {len(rows)} comparisons from {path}")
     return rows
 
 
@@ -246,20 +343,20 @@ def classify(lod_score, expected, threshold):
 
 def check_comparisons(rows, run_samples, database_samples, path):
     """Fail unless every run sample was compared exactly once with every database sample."""
-    pairs = {}
+    pairs = set()
     for row in rows:
         # left side: only this run's fingerprints were given as INPUT
         if row["left"] not in run_samples:
             fail(f"{path}: LEFT_SAMPLE '{row['left']}' is not a sample of this run")
-        # right side: only fingerprints of the updated database were given as SECOND_INPUT
+        # right side: only the kept database fingerprints were given as SECOND_INPUT
         if row["right"] not in database_samples:
             fail(
-                f"{path}: RIGHT_SAMPLE '{row['right']}' is not in the fingerprint database"
+                f"{path}: RIGHT_SAMPLE '{row['right']}' is not a kept fingerprint of the database"
             )
         key = (row["left"], row["right"])
         if key in pairs:
             fail(f"{path}: comparison {row['left']} vs {row['right']} listed twice")
-        pairs[key] = row
+        pairs.add(key)
     expected_pairs = len(run_samples) * len(database_samples)
     if len(pairs) != expected_pairs:
         missing = [
@@ -276,17 +373,12 @@ def check_comparisons(rows, run_samples, database_samples, path):
 
 
 def build_report(rows, run_samples, threshold):
-    """Classify comparisons with other runs, return reported rows and counts."""
+    """Classify the comparisons, return reported rows and counts."""
     counts = {status: 0 for status in ALL_STATUSES}
     unreported_inconclusive = 0
-    same_run_dropped = 0
     reported = []
     for row in rows:
-        # comparisons among this run's samples are shown in the crosscheck heatmap
-        if row["right"] in run_samples:
-            same_run_dropped += 1
-            continue
-        sample, runid = run_samples[row["left"]]
+        sample, runid, _bam = run_samples[row["left"]]
         database_sample, database_runid = split_fingerprint_id(
             row["right"], "crosscheck metrics"
         )
@@ -315,55 +407,26 @@ def build_report(rows, run_samples, threshold):
     reported.sort(
         key=lambda r: (priority[r["status"]], r["sample"], r["runid"], -r["lod_score"])
     )
-    return reported, counts, unreported_inconclusive, same_run_dropped
+    return reported, counts, unreported_inconclusive
 
 
 def format_lod(value):
     return f"{value:.2f}"
 
 
-def write_matches(path, reported):
-    """Write all reported comparisons as TSV."""
+def match_values(row):
+    """Values of a reported comparison in MATCH_COLUMNS order, LODs formatted."""
+    return [
+        format_lod(row[c]) if c.startswith("lod_") else row[c] for c in MATCH_COLUMNS
+    ]
+
+
+def write_tsv(path, header, rows):
+    """Write rows as tab-separated file with a header line."""
     with open(path, "w", newline="") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-        writer.writerow(MATCH_COLUMNS)
-        for row in reported:
-            writer.writerow(
-                [
-                    row[c] if not c.startswith("lod_") else format_lod(row[c])
-                    for c in MATCH_COLUMNS
-                ]
-            )
-
-
-def write_summary(path, summary):
-    """Write the counts as two-column TSV."""
-    with open(path, "w", newline="") as handle:
-        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-        writer.writerow(["metric", "value"])
-        for key, value in summary.items():
-            writer.writerow([key, value])
-
-
-def mqc_description(summary, threshold):
-    """One-paragraph description of the comparison for the MultiQC section."""
-    text = (
-        f"Fingerprints of this run's {summary['run_samples']} samples were compared with "
-        f"{summary['previous_runs_database_samples']} fingerprints of other sequencing runs in "
-        f"the fingerprint database (Picard CrosscheckFingerprints). Fingerprint IDs are "
-        f"&lt;sample&gt;@&lt;runid&gt;; a match is expected when the sample IDs are identical. "
-        f"Match: LOD &ge; {threshold:g}; mismatch: LOD &le; -{threshold:g}; inconclusive in between. "
-        f"Shown: matches, mismatches of the same sample ID and inconclusive comparisons of the "
-        f"same sample ID. Not shown: {summary['expected_mismatch']} expected mismatches and "
-        f"{summary['inconclusive_other_sample']} inconclusive comparisons between different "
-        f"sample IDs."
-    )
-    if summary["replaced_fingerprints"]:
-        text += (
-            f" {summary['replaced_fingerprints']} fingerprint(s) of this run were already in the "
-            f"database and were replaced."
-        )
-    return text
+        writer.writerow(header)
+        writer.writerows(rows)
 
 
 def yaml_quote(value):
@@ -371,12 +434,35 @@ def yaml_quote(value):
     return "'" + str(value).replace("'", "''") + "'"
 
 
+def comparison_rules(threshold):
+    """HTML sentence explaining the classification."""
+    return (
+        "Fingerprint IDs are &lt;sample&gt;@&lt;runid&gt;; a match is expected when the sample "
+        f"IDs are identical. Match: LOD &ge; {threshold:g}; mismatch: LOD &le; -{threshold:g}; "
+        "inconclusive in between."
+    )
+
+
+def matches_description(summary, threshold):
+    """One-paragraph description of the database comparison for MultiQC."""
+    return (
+        f"This run's {summary['run_samples']} fingerprints were compared with the "
+        f"{summary['checked_database_samples']} fingerprints of other sequencing runs in the "
+        f"given fingerprint database (Picard CrosscheckFingerprints), before this run was added "
+        f"to it. {comparison_rules(threshold)} Shown: matches, mismatches of the same sample ID "
+        f"and inconclusive comparisons of the same sample ID. Not shown: "
+        f"{summary['expected_mismatch']} expected mismatches and "
+        f"{summary['inconclusive_other_sample']} inconclusive comparisons between different "
+        "sample IDs."
+    )
+
+
 def write_mqc_table(path, reported, summary, threshold):
     """Write the reported comparisons as MultiQC custom content table."""
     header = [
         f"id: {yaml_quote(MQC_ID)}",
         f"section_name: {yaml_quote('Crosscheck Fingerprints: Database matches')}",
-        f"description: {yaml_quote(mqc_description(summary, threshold))}",
+        f"description: {yaml_quote(matches_description(summary, threshold))}",
         "plot_type: 'table'",
         "pconfig:",
         f"    id: {yaml_quote(MQC_ID + '_table')}",
@@ -420,35 +506,132 @@ def write_mqc_table(path, reported, summary, threshold):
                 f"{row['sample']}{ID_SEPARATOR}{row['runid']} vs "
                 f"{row['database_sample']}{ID_SEPARATOR}{row['database_runid']}"
             )
-            writer.writerow(
-                [comparison]
-                + [
-                    row[c] if not c.startswith("lod_") else format_lod(row[c])
-                    for c in MATCH_COLUMNS
-                ]
-            )
+            writer.writerow([comparison] + match_values(row))
 
 
-def write_mqc_note(path, summary, threshold, has_previous_database):
-    """Write a MultiQC custom content HTML note when no comparison is reported."""
-    if has_previous_database:
-        note = "No matches with fingerprints of other sequencing runs were found."
-    else:
-        note = (
-            "No fingerprint database of previous runs was given. The new database contains only "
-            "this run's samples."
-        )
+def write_mqc_html(path, section_id, section_name, description, body):
+    """Write a MultiQC custom content HTML section."""
     with open(path, "w") as handle:
         handle.write("<!--\n")
-        handle.write(f"id: {yaml_quote(MQC_ID)}\n")
-        handle.write(
-            f"section_name: {yaml_quote('Crosscheck Fingerprints: Database matches')}\n"
-        )
-        handle.write(
-            f"description: {yaml_quote(mqc_description(summary, threshold))}\n"
-        )
+        handle.write(f"id: {yaml_quote(section_id)}\n")
+        handle.write(f"section_name: {yaml_quote(section_name)}\n")
+        handle.write(f"description: {yaml_quote(description)}\n")
         handle.write("-->\n")
-        handle.write(f"<p><strong>{html.escape(note)}</strong></p>\n")
+        handle.write(body)
+
+
+def write_mqc_note(path, summary, threshold):
+    """Write the database section as a note when no comparison is reported."""
+    if not summary["database_given"]:
+        note = (
+            "No fingerprint database of previous runs was given; this run was not compared "
+            "with other runs. The new database contains only this run's fingerprints."
+        )
+        description = (
+            "Comparison of this run with the fingerprint database of previous runs."
+        )
+    elif not summary["checked_database_samples"]:
+        note = (
+            "The given fingerprint database contained only fingerprints of this run (same sample "
+            "and run ID); they were replaced, so there was nothing to compare with."
+        )
+        description = (
+            "Comparison of this run with the fingerprint database of previous runs."
+        )
+    else:
+        note = "No matches with fingerprints of other sequencing runs were found."
+        description = matches_description(summary, threshold)
+    write_mqc_html(
+        path,
+        MQC_ID,
+        "Crosscheck Fingerprints: Database matches",
+        description,
+        f"<p><strong>{html.escape(note)}</strong></p>\n",
+    )
+
+
+STATUS_LABELS = {
+    "SUITABLE": "label-success",
+    "INSUFFICIENT": "label-warning",
+    "NO_COVERAGE": "label-danger",
+}
+
+
+def overview_html(summary, fingerprint_rows, replaced, threshold):
+    """HTML body of the overview section: what was checked, and each fingerprint."""
+    e = html.escape
+    items = [
+        (
+            f"<strong>Haplotype map:</strong> {e(summary['haplotype_map_file'])}, "
+            f"{summary['haplotype_map_snps']} SNPs in {summary['haplotype_map_blocks']} "
+            "haplotype blocks; one SNP per block is compared."
+        ),
+        (
+            f"<strong>This run:</strong> {summary['run_samples']} samples; "
+            f"{summary['run_samples_suitable']} with a suitable fingerprint, "
+            f"{summary['run_samples_insufficient']} insufficient, "
+            f"{summary['run_samples_no_coverage']} without reads at the haplotype map SNPs."
+        ),
+    ]
+    if summary["database_given"]:
+        items.append(
+            f"<strong>Fingerprint database:</strong> {e(summary['database_file'])} "
+            f"({e(summary['database_compression'])}), {summary['previous_database_samples']} "
+            f"fingerprints; checked against the haplotype map. This run was compared with "
+            f"{summary['checked_database_samples']} fingerprints of "
+            f"{summary['checked_database_runs']} other runs, before it was added."
+        )
+    else:
+        items.append(
+            "<strong>Fingerprint database:</strong> none given; this run was not compared with "
+            "other runs."
+        )
+    if replaced:
+        items.append(
+            f'<span class="label label-warning">WARNING</span> {len(replaced)} fingerprint(s) '
+            "of the given database had the same sample and run ID as this run; they were dropped "
+            f"and replaced by the new fingerprints: {e(', '.join(replaced))}"
+        )
+    if summary["database_given"] and summary["checked_database_samples"]:
+        items.append(
+            f"<strong>Comparisons with the database:</strong> {summary['comparisons']}; "
+            f"unexpected matches: {summary['unexpected_match']}, unexpected mismatches: "
+            f"{summary['unexpected_mismatch']}, expected matches: {summary['expected_match']}, "
+            f"inconclusive (same sample ID): {summary['inconclusive_same_sample']} "
+            "(see Crosscheck Fingerprints: Database matches)."
+        )
+    items.append(
+        f"<strong>Updated database:</strong> {e(summary['updated_database_file'])}, "
+        f"{summary['database_samples']} fingerprints. Use it as --fingerprint_database of the "
+        "next run."
+    )
+    body = ["<ul>"] + [f"<li>{item}</li>" for item in items] + ["</ul>"]
+    # one table row per sample of this run
+    body += [
+        '<table class="table table-condensed table-hover">',
+        (
+            "<thead><tr><th>Sample</th><th>Run</th><th>Haplotype blocks with reads</th>"
+            "<th>Mean depth</th><th>Self LOD</th><th>Fingerprint</th></tr></thead>"
+        ),
+        "<tbody>",
+    ]
+    for row in fingerprint_rows:
+        fraction = float(row["fraction_blocks_with_reads"])
+        body.append(
+            f"<tr><td>{e(row['sample'])}</td><td>{e(row['runid'])}</td>"
+            f"<td>{row['blocks_with_reads']} / {row['haplotype_blocks']} ({fraction:.1%})</td>"
+            f"<td>{row['mean_depth']}</td><td>{row['self_lod']}</td>"
+            f'<td><span class="label {STATUS_LABELS[row["status"]]}">{row["status"]}</span></td></tr>'
+        )
+    body += ["</tbody>", "</table>"]
+    body.append(
+        "<p>Self LOD: LOD score of the sample's BAM compared with itself (diagonal of the "
+        f"crosscheck heatmap). SUITABLE: self LOD &ge; {threshold:g}, so a match with another "
+        f"fingerprint of the same person can be called. INSUFFICIENT: self LOD &lt; {threshold:g}; "
+        "matches of this sample can not be called and stay inconclusive. NO_COVERAGE: no read at "
+        "any haplotype block.</p>"
+    )
+    return "\n".join(body) + "\n"
 
 
 def parse_args(argv):
@@ -456,16 +639,26 @@ def parse_args(argv):
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--crosscheck",
-        required=True,
-        type=Path,
-        help="CrosscheckFingerprints metrics of run vs database",
-    )
-    parser.add_argument(
         "--run-samples",
         required=True,
         type=Path,
-        help="TSV with columns fingerprint_id, sample, runid",
+        help="TSV with columns fingerprint_id, sample, runid, bam",
+    )
+    parser.add_argument(
+        "--fingerprints",
+        required=True,
+        nargs="+",
+        type=Path,
+        help="fingerprint VCFs of this run (Picard ExtractFingerprint)",
+    )
+    parser.add_argument(
+        "--haplotype-map", required=True, type=Path, help="Picard haplotype map"
+    )
+    parser.add_argument(
+        "--run-crosscheck",
+        required=True,
+        type=Path,
+        help="CrosscheckFingerprints metrics of this run's BAMs (CROSSCHECK_BY FILE)",
     )
     parser.add_argument(
         "--database",
@@ -474,9 +667,19 @@ def parse_args(argv):
         help="updated fingerprint database (.vcf.gz)",
     )
     parser.add_argument(
-        "--previous-database",
+        "--database-check",
         type=Path,
-        help="fingerprint database given to this run (.vcf.gz)",
+        help="check result of the given database (metric, value)",
+    )
+    parser.add_argument(
+        "--database-samples",
+        type=Path,
+        help="fingerprints of the given database (fingerprint_id, sample, runid, action)",
+    )
+    parser.add_argument(
+        "--crosscheck",
+        type=Path,
+        help="CrosscheckFingerprints metrics of this run against the kept database fingerprints",
     )
     parser.add_argument(
         "--lod-threshold", required=True, type=float, help="LOD threshold T (> 0)"
@@ -487,57 +690,83 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
+def read_database_check(path):
+    """Read the metric/value table written by check_fingerprint_database.py."""
+    return {
+        row["metric"]: row["value"]
+        for _line, row in read_tsv(path, ["metric", "value"])
+    }
+
+
 def main(argv=None):
     args = parse_args(argv)
     # a threshold of 0 or below would make match and mismatch overlap
     if not args.lod_threshold > 0:
         fail(f"--lod-threshold must be > 0, observed {args.lod_threshold}")
+    # the database check result and its sample list come together
+    if bool(args.database_check) != bool(args.database_samples):
+        fail("--database-check and --database-samples must be given together")
 
+    haplotype_map = read_haplotype_map(args.haplotype_map)
     run_samples = read_run_samples(args.run_samples)
+    coverage = read_fingerprints(args.fingerprints, run_samples, haplotype_map)
+    self_lods = read_self_lods(args.run_crosscheck, run_samples)
+    fingerprint_rows = build_fingerprint_rows(
+        run_samples, coverage, self_lods, args.lod_threshold
+    )
+
+    kept, replaced, check = [], [], {}
+    if args.database_samples:
+        check = read_database_check(args.database_check)
+        kept, replaced = read_database_samples(args.database_samples, run_samples)
+
+    # the updated database must be the kept fingerprints plus this run, nothing else
     database_samples = read_vcf_samples(args.database)
-    for fingerprint_id in database_samples:
-        split_fingerprint_id(fingerprint_id, f"{args.database} (sample in VCF header)")
-    # the updated database must contain every fingerprint of this run
-    missing = [s for s in run_samples if s not in database_samples]
-    if missing:
+    expected_database = set(kept) | set(run_samples)
+    if set(database_samples) != expected_database:
+        unexpected = sorted(set(database_samples) - expected_database)
+        lost = sorted(expected_database - set(database_samples))
         fail(
-            f"{args.database}: fingerprints of this run missing in the database: {', '.join(missing)}"
+            f"{args.database}: database content differs from the kept fingerprints + this run "
+            f"(unexpected: {', '.join(unexpected) or '-'}; missing: {', '.join(lost) or '-'})"
         )
 
-    previous, replaced = ([], [])
-    if args.previous_database:
-        previous, replaced = read_previous_database(args.previous_database, run_samples)
-        # the updated database must be the previous one plus this run, nothing else
-        expected_database = set(previous) | set(run_samples)
-        if set(database_samples) != expected_database:
-            unexpected = sorted(set(database_samples) - expected_database)
-            lost = sorted(expected_database - set(database_samples))
-            fail(
-                f"{args.database}: database content differs from previous database + this run "
-                f"(unexpected: {', '.join(unexpected) or '-'}; missing: {', '.join(lost) or '-'})"
-            )
-    elif set(database_samples) != set(run_samples):
+    # the crosscheck against the database exists exactly when fingerprints were kept
+    if bool(kept) != bool(args.crosscheck):
         fail(
-            f"{args.database}: without a previous database it must contain only this run's samples"
+            f"--crosscheck must be given exactly when the database has kept fingerprints "
+            f"({len(kept)} kept, crosscheck {'given' if args.crosscheck else 'not given'})"
         )
-
-    rows = read_crosscheck_metrics(args.crosscheck)
-    check_comparisons(rows, run_samples, set(database_samples), args.crosscheck)
-    reported, counts, unreported_inconclusive, same_run_dropped = build_report(
+    rows = []
+    if args.crosscheck:
+        rows = read_crosscheck_metrics(args.crosscheck)
+        check_comparisons(rows, run_samples, set(kept), args.crosscheck)
+    reported, counts, unreported_inconclusive = build_report(
         rows, run_samples, args.lod_threshold
     )
 
-    other_run_samples = [s for s in database_samples if s not in run_samples]
+    statuses = [row["status"] for row in fingerprint_rows]
     summary = {
         "lod_threshold": f"{args.lod_threshold:g}",
+        "haplotype_map_file": args.haplotype_map.name,
+        "haplotype_map_snps": len(haplotype_map.snps),
+        "haplotype_map_blocks": len(haplotype_map.blocks),
         "run_samples": len(run_samples),
-        "previous_database_samples": len(previous),
+        "run_samples_suitable": statuses.count("SUITABLE"),
+        "run_samples_insufficient": statuses.count("INSUFFICIENT"),
+        "run_samples_no_coverage": statuses.count("NO_COVERAGE"),
+        "database_given": bool(args.database_samples),
+        "database_file": check.get("database_file", ""),
+        "database_compression": check.get("database_compression", ""),
+        "previous_database_samples": len(kept) + len(replaced),
         "replaced_fingerprints": len(replaced),
+        "checked_database_samples": len(kept),
+        "checked_database_runs": len(
+            {split_fingerprint_id(f, "database")[1] for f in kept}
+        ),
+        "updated_database_file": args.database.name,
         "database_samples": len(database_samples),
-        "previous_runs_database_samples": len(other_run_samples),
-        "comparisons_read": len(rows),
-        "comparisons_same_run_dropped": same_run_dropped,
-        "comparisons_other_runs": len(rows) - same_run_dropped,
+        "comparisons": len(rows),
         "unexpected_match": counts["UNEXPECTED_MATCH"],
         "unexpected_mismatch": counts["UNEXPECTED_MISMATCH"],
         "expected_match": counts["EXPECTED_MATCH"],
@@ -547,22 +776,59 @@ def main(argv=None):
         "reported_comparisons": len(reported),
     }
 
-    write_matches(f"{args.prefix}_matches.tsv", reported)
-    write_summary(f"{args.prefix}_summary.tsv", summary)
+    write_tsv(
+        f"{args.prefix}_matches.tsv", MATCH_COLUMNS, [match_values(r) for r in reported]
+    )
+    write_tsv(
+        f"{args.prefix}_fingerprints.tsv",
+        FINGERPRINT_COLUMNS,
+        [[row[c] for c in FINGERPRINT_COLUMNS] for row in fingerprint_rows],
+    )
+    write_tsv(
+        f"{args.prefix}_summary.tsv",
+        ["metric", "value"],
+        [
+            [k, "yes" if v is True else "no" if v is False else v]
+            for k, v in summary.items()
+        ],
+    )
+    write_mqc_html(
+        f"{args.prefix}_overview_mqc.html",
+        MQC_OVERVIEW_ID,
+        "Fingerprint check: overview",
+        "What the fingerprint check compared, and whether each sample of this run gave a "
+        f"usable fingerprint. {comparison_rules(args.lod_threshold)}",
+        overview_html(summary, fingerprint_rows, replaced, args.lod_threshold),
+    )
     if reported:
         write_mqc_table(
             f"{args.prefix}_matches_mqc.tsv", reported, summary, args.lod_threshold
         )
     else:
-        write_mqc_note(
-            f"{args.prefix}_matches_mqc.html",
-            summary,
-            args.lod_threshold,
-            bool(args.previous_database),
-        )
+        write_mqc_note(f"{args.prefix}_matches_mqc.html", summary, args.lod_threshold)
 
     for key, value in summary.items():
         info(f"{key}: {value}")
+    for row in fingerprint_rows:
+        # name the reason: no reads at all, or too little information
+        if row["status"] == "NO_COVERAGE":
+            warning(
+                f"{row['fingerprint_id']}: fingerprint NO_COVERAGE (no read at any of the "
+                f"{row['haplotype_blocks']} haplotype blocks); check that the BAM is aligned to "
+                "the reference of the haplotype map and covers its SNPs"
+            )
+        elif row["status"] == "INSUFFICIENT":
+            warning(
+                f"{row['fingerprint_id']}: fingerprint INSUFFICIENT (self LOD {row['self_lod']} "
+                f"< {args.lod_threshold:g}, {row['blocks_with_reads']} of "
+                f"{row['haplotype_blocks']} haplotype blocks with reads); its comparisons can "
+                "not reach a match"
+            )
+    if replaced:
+        warning(
+            f"{len(replaced)} fingerprint(s) of the given database were dropped and replaced "
+            f"by this run: {', '.join(replaced)}"
+        )
     if counts["UNEXPECTED_MATCH"] or counts["UNEXPECTED_MISMATCH"]:
         warning(
             f"{counts['UNEXPECTED_MATCH']} unexpected match(es) and {counts['UNEXPECTED_MISMATCH']} "

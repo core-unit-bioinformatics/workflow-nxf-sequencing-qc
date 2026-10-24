@@ -14,6 +14,8 @@ fingerprintcheck/fingerprints/*.vcf.gz.tbi
 fingerprintcheck/database/*.vcf.gz
 fingerprintcheck/database/*.vcf.gz.tbi
 fingerprintcheck/database/*.crosscheck_metrics.txt
+fingerprintcheck/database/fingerprint_database_summary.tsv
+fingerprintcheck/database/fingerprint_database_overview_mqc.html
 samtools/*
 samplesheet_test.csv
 multiqc_inputs_test.csv

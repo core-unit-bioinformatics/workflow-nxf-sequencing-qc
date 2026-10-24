@@ -70,8 +70,8 @@
                     "type": "string",
                     "format": "file-path",
                     "exists": true,
-                    "description": "Path to Picard/GATK haplotype map used by CrosscheckFingerprints.",
-                    "help_text": "Required when `--enable_fingerprintcheck` is set."
+                    "description": "Path to the Picard haplotype map (text format) used for the fingerprints.",
+                    "help_text": "Required when `--enable_fingerprintcheck` is set. Must be the text format with `@SQ` header lines (e.g. `Homo_sapiens_assembly38.haplotype_database.txt`); haplotype maps in VCF format are not supported. Use the same map for all runs of one fingerprint database."
                 },
                 "fingerprint_allow_duplicate_reads": {
                     "type": "boolean",
@@ -88,16 +88,16 @@
                     "type": "string",
                     "format": "file-path",
                     "exists": true,
-                    "pattern": "^\\S+\\.vcf\\.gz$",
-                    "description": "Fingerprint database of previous exomeqc runs (`fingerprintcheck/database/exomeqc_fingerprint_database.vcf.gz`).",
-                    "help_text": "Optional. A tabix (`.tbi`) or CSI index must exist next to it. This run's fingerprints are merged into it (fingerprints with the same `<sample>@<runid>` are replaced) and the result is written as the new database. Must be built with the same haplotype map and reference."
+                    "pattern": "^\\S+\\.vcf(\\.gz)?$",
+                    "description": "Fingerprint database of previous exomeqc runs (`fingerprintcheck/database/exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz`).",
+                    "help_text": "Optional. Plain VCF, gzip or bgzip; an index is not needed (a new one is made). Checked against `--fingerprint_haplotype_map` first; a database of another haplotype map or reference stops the run with an ERROR. WARNING: fingerprints with the same sample AND run ID (`<sample>@<runid>`) as a sample of this run are dropped and replaced by the new ones. This run is compared with the remaining fingerprints, then added to them; the result is written as the new database. The given file is not modified."
                 },
                 "fingerprint_database_lod_threshold": {
                     "type": "number",
                     "default": 5,
                     "exclusiveMinimum": 0,
                     "description": "LOD threshold T for comparisons with the fingerprint database: match if LOD >= T, mismatch if LOD <= -T, inconclusive in between.",
-                    "help_text": "A LOD of N means the two fingerprints are 10^N times more likely to come from the same individual than from different ones."
+                    "help_text": "A LOD of N means the two fingerprints are 10^N times more likely to come from the same individual than from different ones. Also used for the fingerprint of each sample: SUITABLE if its self LOD (the sample's BAM compared with itself) is >= T, else INSUFFICIENT."
                 }
             }
         },

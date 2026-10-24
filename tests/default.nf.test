@@ -18,18 +18,23 @@ nextflow_pipeline {
                     .replace('tests/fixtures/fingerprint/', "${fixtures}/")
                 input = samplesheet.toString()
                 def multiqc_inputs_file = new File("${outputDir}/multiqc_inputs_test.csv")
-                multiqc_inputs_file.text = "paths\n${fixtures}/report\n"
+                multiqc_inputs_file.text = "paths\n${fixtures}/multiqc\n"
                 multiqc_inputs = multiqc_inputs_file.toString()
             }
         }
 
         then {
+            // the updated database is named with the start time of the run
+            def database_pattern = 'fingerprintcheck/database/exomeqc_fingerprint_database_*'
             // stable_name: All files + folders in ${params.outdir}/ with a stable name
-            def stable_name = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/*_multiqc_report_plots/**'])
+            def stable_name = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/*_multiqc_report_plots/**', database_pattern])
             // stable_path: All files in ${params.outdir}/ with stable content
             def stable_path = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
+            def databases = new File("${params.outdir}/fingerprintcheck/database").listFiles().findAll { f -> f.name.startsWith('exomeqc_fingerprint_database_') }.collect { f -> f.name }.sort()
+            def summary = path("${params.outdir}/fingerprintcheck/database/fingerprint_database_summary.tsv").readLines()
             // MultiQC names its data directory after the report title
             def multiqc_data = new File("${params.outdir}/multiqc").listFiles().find { dir -> dir.name.endsWith('multiqc_report_data') }
+            def multiqc_report = new File("${params.outdir}/multiqc").listFiles().find { f -> f.name.endsWith('multiqc_report.html') }
             // heatmap LODs as sorted 'row column LOD' lines; Picard's sample order can differ between runs
             def heatmap_lines = path("${multiqc_data}/picard-crosscheckfingerprints-heatmap.txt").readLines()
             def heatmap_columns = heatmap_lines[0].split('\t')
@@ -41,10 +46,17 @@ nextflow_pipeline {
                 { assert workflow.success},
                 // the database table of the report holds exactly the three cases of the fixture design
                 { assert path("${params.outdir}/fingerprintcheck/database/fingerprint_database_matches.tsv").readLines().size() == 4 },
+                // one updated database with index, named exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>
+                { assert databases.size() == 2 },
+                { assert databases[0] ==~ /exomeqc_fingerprint_database_\d{8}-\d{6}\.vcf\.gz/ },
+                { assert databases[1] == "${databases[0]}.tbi".toString() },
+                { assert summary.contains("updated_database_file\t${databases[0]}".toString()) },
                 // the Picard heatmap shows only this run's four samples (the database crosscheck is excluded)
                 { assert path("${multiqc_data}/multiqc_sources.txt").readLines().findAll { line -> line.contains('crosscheck_metrics') }.every { line -> line.contains('crosscheck.crosscheck_metrics.txt') } },
                 // the database section is in the report (custom content is not listed in multiqc_sources.txt)
                 { assert new File("${multiqc_data}/multiqc_exomeqc_fingerprint_database_table.txt").exists() },
+                // the overview section is in the report
+                { assert multiqc_report.text.contains('Fingerprint check: overview') },
                 { assert snapshot(
                     // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
                     removeNextflowVersion("$outputDir/pipeline_info/exomeqc_software_mqc_versions.yml"),
@@ -52,6 +64,8 @@ nextflow_pipeline {
                     stable_name,
                     // All files with stable contents
                     stable_path,
+                    // the summary without the timestamped database name
+                    summary.findAll { line -> !line.startsWith('updated_database_file') },
                     // crosscheck heatmap of this run's four samples
                     heatmap
                 ).match() }

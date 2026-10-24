@@ -3,10 +3,13 @@
     SUBWORKFLOW: FINGERPRINTCHECK
     1. Crosscheck the fingerprints of all samples of this run (Picard
        CrosscheckFingerprints on the BAMs, heatmap in MultiQC).
-    2. Extract one fingerprint VCF per sample (Picard ExtractFingerprint),
-       merge them with the fingerprint database of previous runs into an
-       updated database, crosscheck this run against it and report matches
-       with samples of other runs.
+    2. Extract one fingerprint VCF per sample (Picard ExtractFingerprint).
+       If a fingerprint database of previous runs is given: check it against
+       the haplotype map, drop the fingerprints this run replaces, convert it
+       to bgzip with index, and crosscheck this run against it. Then add this
+       run's fingerprints to it: the updated database, with a timestamp in
+       the file name. Report the fingerprint check and the matches with
+       samples of other runs.
     Samples without a BAM are aligned with bwa-mem2 if align_reads is true.
     Fingerprint IDs are <sample>@<runid>, so that the same sample sequenced in
     several runs keeps one fingerprint per run.
@@ -20,9 +23,10 @@ include { BWAMEM2_MEM                                                           
 include { SAMTOOLS_INDEX                                                         } from '../../../modules/nf-core/samtools/index/main'
 include { PICARD_CROSSCHECKFINGERPRINTS                                          } from '../../../modules/nf-core/picard/crosscheckfingerprints/main'
 include { PICARD_EXTRACTFINGERPRINT                                              } from '../../../modules/nf-core/picard/extractfingerprint/main'
-include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_FINGERPRINT_DATABASE   } from '../../../modules/nf-core/bcftools/view/main'
-include { BCFTOOLS_MERGE as BCFTOOLS_MERGE_FINGERPRINT_DATABASE } from '../../../modules/nf-core/bcftools/merge/main'
+include { CHECK_FINGERPRINT_DATABASE                                             } from '../../../modules/local/check_fingerprint_database/main'
+include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_FINGERPRINT_DATABASE                    } from '../../../modules/nf-core/bcftools/view/main'
 include { PICARD_CROSSCHECKFINGERPRINTS as PICARD_CROSSCHECKFINGERPRINTS_DATABASE } from '../../../modules/nf-core/picard/crosscheckfingerprints/main'
+include { BCFTOOLS_MERGE as BCFTOOLS_MERGE_FINGERPRINT_DATABASE                  } from '../../../modules/nf-core/bcftools/merge/main'
 include { FINGERPRINT_DATABASE_REPORT                                            } from '../../../modules/local/fingerprint_database_report/main'
 
 workflow FINGERPRINTCHECK {
@@ -35,7 +39,7 @@ workflow FINGERPRINTCHECK {
     fasta_dict           // path or null: sequence dictionary, created with Picard if null
     bwamem2_index        // path or null: bwa-mem2 index directory, built from fasta if null
     align_reads          // boolean: align samples without BAM with bwa-mem2
-    fingerprint_database // path or null: fingerprint database (.vcf.gz) of previous runs
+    fingerprint_database // path or null: fingerprint database of previous runs (VCF, plain, gzip or bgzip)
 
     main:
     ch_versions = channel.empty()
@@ -44,6 +48,8 @@ workflow FINGERPRINTCHECK {
     def name_pattern = ~/^[A-Za-z0-9._-]+$/
     def haplotype_map_file = file(haplotype_map, checkIfExists: true)
     def fasta_file = file(fasta, checkIfExists: true)
+    // the updated database is named with the start time of this pipeline run
+    def database_timestamp = workflow.start.format(java.time.format.DateTimeFormatter.ofPattern('yyyyMMdd-HHmmss'))
 
     // -------------------------------------------------------------------------
     // Validate every samplesheet row and build the fingerprint meta map:
@@ -213,54 +219,97 @@ workflow FINGERPRINTCHECK {
         .collect(flat: false)
         .map { rows -> [ rows.collect { row -> row[0] }, rows.collect { row -> row[1] } ] }
 
-    // this run's samples as TSV (fingerprint_id, sample, runid) for the report
-    ch_run_samples = ch_fingerprints
-        .map { meta, _vcf, _tbi -> "${meta.fingerprint_id}\t${meta.id}\t${meta.runid}" }
-        .collectFile(name: 'run_samples.tsv', seed: "fingerprint_id\tsample\trunid", newLine: true, sort: true)
+    // this run's samples as TSV for the report; the BAM file name links each
+    // sample to its rows in the crosscheck of step 1 (CROSSCHECK_BY FILE)
+    ch_run_samples = ch_bam_with_index
+        .map { meta, bam, _index -> "${meta.fingerprint_id}\t${meta.id}\t${meta.runid}\t${bam.name}" }
+        .collectFile(name: 'run_samples.tsv', seed: "fingerprint_id\tsample\trunid\tbam", newLine: true, sort: true)
 
-    // -------------------------------------------------------------------------
-    // 2b. Previous database: drop fingerprints that this run replaces
-    // -------------------------------------------------------------------------
-    def previous_database_file = null
     if (fingerprint_database) {
-        previous_database_file = file(fingerprint_database, checkIfExists: true)
-        // bcftools merge needs a bgzipped, indexed VCF
-        if (!previous_database_file.name.endsWith('.vcf.gz')) {
-            error("FINGERPRINTCHECK: --fingerprint_database '${fingerprint_database}': expected a bgzipped VCF (.vcf.gz), e.g. exomeqc_fingerprint_database.vcf.gz from fingerprintcheck/database/ of a previous run")
-        }
-        def previous_tbi = file("${previous_database_file}.tbi")
-        def previous_csi = file("${previous_database_file}.csi")
-        def previous_database_index = previous_tbi.exists() ? previous_tbi : previous_csi.exists() ? previous_csi : null
-        if (!previous_database_index) {
-            error("FINGERPRINTCHECK: --fingerprint_database '${fingerprint_database}': no index found (expected '${previous_tbi}' or '${previous_csi}'); create one with 'tabix -p vcf ${fingerprint_database}'")
-        }
+        def database_file = file(fingerprint_database, checkIfExists: true)
 
-        // exclude every fingerprint ID of this run from the previous database
-        // (absent IDs are ignored); the report script lists the replaced ones
-        ch_previous_database = ch_fingerprints
-            .map { meta, _vcf, _tbi -> meta.fingerprint_id }
-            .collect()
-            .map { ids ->
-                [ [ id: 'previous_fingerprint_database', exclude_ids: ids.sort() ], previous_database_file, previous_database_index ]
+        // ---------------------------------------------------------------------
+        // 2b. Check the given database against the haplotype map and list the
+        // fingerprints this run replaces (same <sample>@<runid>)
+        // ---------------------------------------------------------------------
+        // this run's fingerprint IDs are known from the samplesheet, so the
+        // check runs before any alignment or fingerprint extraction
+        ch_run_fingerprint_ids = ch_samples.bam
+            .mix(ch_samples.align)
+            .map { meta, _files -> meta.fingerprint_id }
+            .collectFile(name: 'run_fingerprint_ids.txt', newLine: true, sort: true)
+
+        CHECK_FINGERPRINT_DATABASE(
+            channel.value([ [ id: 'previous_database' ], database_file ]),
+            haplotype_map_file,
+            ch_run_fingerprint_ids
+        )
+
+        // ---------------------------------------------------------------------
+        // 2c. Keep the listed fingerprints and write them as bgzipped VCF with
+        // tabix index; bcftools reads plain VCF, gzip and bgzip, and needs no
+        // index here. Skipped if the database holds only this run's IDs.
+        // ---------------------------------------------------------------------
+        ch_database_to_keep = CHECK_FINGERPRINT_DATABASE.out.keep
+            .filter { _meta, keep -> keep.size() > 0 }
+            .map { meta, keep -> [ meta, database_file, keep ] }
+
+        BCFTOOLS_VIEW_FINGERPRINT_DATABASE(
+            ch_database_to_keep.map { meta, database, _keep -> [ meta, database, [] ] },
+            [],
+            [],
+            ch_database_to_keep.map { _meta, _database, keep -> keep }
+        )
+
+        // kept fingerprints with their index: [ meta, vcf.gz, tbi ]
+        ch_previous_kept = BCFTOOLS_VIEW_FINGERPRINT_DATABASE.out.vcf
+            .join(BCFTOOLS_VIEW_FINGERPRINT_DATABASE.out.index, by: 0, failOnMismatch: true)
+
+        // ---------------------------------------------------------------------
+        // 2d. Crosscheck this run's fingerprints against the kept database
+        // fingerprints, before this run is added to the database
+        // ---------------------------------------------------------------------
+        ch_crosscheck_database_input = ch_fingerprint_lists
+            .combine(ch_previous_kept)
+            .map { vcfs, tbis, _meta, database, database_index ->
+                [ [ id: 'fingerprint_database' ], vcfs, tbis, [ database ], [ database_index ], haplotype_map_file ]
             }
 
-        BCFTOOLS_VIEW_FINGERPRINT_DATABASE(ch_previous_database, [], [], [])
+        PICARD_CROSSCHECKFINGERPRINTS_DATABASE(
+            ch_crosscheck_database_input,
+            ch_fingerprint_reference
+        )
 
-        // filtered previous database as one-element lists: [ [ vcf ], [ tbi ] ]
-        ch_previous_filtered = BCFTOOLS_VIEW_FINGERPRINT_DATABASE.out.vcf
-            .join(BCFTOOLS_VIEW_FINGERPRINT_DATABASE.out.index, by: 0, failOnMismatch: true)
+        // inputs of the merge and the report; [] where nothing was kept
+        ch_previous_for_merge = ch_previous_kept
             .map { _meta, vcf, tbi -> [ [ vcf ], [ tbi ] ] }
+            .ifEmpty([ [], [] ])
+        ch_database_crosscheck = PICARD_CROSSCHECKFINGERPRINTS_DATABASE.out.crosscheck_metrics
+            .map { _meta, metrics -> [ metrics ] }
+            .ifEmpty([ [] ])
+        ch_database_check = CHECK_FINGERPRINT_DATABASE.out.check
+            .join(CHECK_FINGERPRINT_DATABASE.out.samples, by: 0, failOnMismatch: true)
+            .map { _meta, check, samples -> [ check, samples ] }
+        ch_database_check_results = CHECK_FINGERPRINT_DATABASE.out.check
+        ch_database_crosscheck_metrics = PICARD_CROSSCHECKFINGERPRINTS_DATABASE.out.crosscheck_metrics
     } else {
-        ch_previous_filtered = channel.value([ [], [] ])
+        // no database of previous runs: the updated database is this run only
+        ch_previous_for_merge = channel.value([ [], [] ])
+        ch_database_crosscheck = channel.value([ [] ])
+        ch_database_check = channel.value([ [], [] ])
+        ch_database_check_results = channel.empty()
+        ch_database_crosscheck_metrics = channel.empty()
     }
 
     // -------------------------------------------------------------------------
-    // 2c. Merge this run's fingerprints with the previous database
+    // 2e. Add this run's fingerprints to the kept database fingerprints:
+    // updated database exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz
     // -------------------------------------------------------------------------
     ch_merge_input = ch_fingerprint_lists
-        .combine(ch_previous_filtered)
+        .combine(ch_previous_for_merge)
         .map { vcfs, tbis, previous_vcfs, previous_tbis ->
-            [ [ id: 'exomeqc_fingerprint_database' ], vcfs + previous_vcfs, tbis + previous_tbis, [] ]
+            // bcftools/merge orders the files by name, which sets the sample order
+            [ [ id: "exomeqc_fingerprint_database_${database_timestamp}".toString() ], previous_vcfs + vcfs, previous_tbis + tbis, [] ]
         }
 
     BCFTOOLS_MERGE_FINGERPRINT_DATABASE(ch_merge_input, [ [:], [], [] ])
@@ -270,27 +319,16 @@ workflow FINGERPRINTCHECK {
         .join(BCFTOOLS_MERGE_FINGERPRINT_DATABASE.out.index, by: 0, failOnMismatch: true)
 
     // -------------------------------------------------------------------------
-    // 2d. Crosscheck this run's fingerprints against the updated database
+    // 2f. Report the fingerprint check and the matches with other runs
     // -------------------------------------------------------------------------
-    ch_crosscheck_database_input = ch_fingerprint_lists
-        .combine(ch_database)
-        .map { vcfs, tbis, _meta, database, database_index ->
-            [ [ id: 'fingerprint_database' ], vcfs, tbis, [ database ], [ database_index ], haplotype_map_file ]
-        }
-
-    PICARD_CROSSCHECKFINGERPRINTS_DATABASE(
-        ch_crosscheck_database_input,
-        ch_fingerprint_reference
-    )
-
-    // -------------------------------------------------------------------------
-    // 2e. Report matches with samples of other runs
-    // -------------------------------------------------------------------------
-    ch_report_input = PICARD_CROSSCHECKFINGERPRINTS_DATABASE.out.crosscheck_metrics
+    ch_report_input = ch_fingerprint_lists
         .combine(ch_run_samples)
-        .combine(ch_database.map { _meta, database, _database_index -> database })
-        .map { meta, metrics, run_samples, database ->
-            [ meta, metrics, run_samples, database, previous_database_file ?: [] ]
+        .combine(PICARD_CROSSCHECKFINGERPRINTS.out.crosscheck_metrics)
+        .combine(ch_database)
+        .combine(ch_database_check)
+        .combine(ch_database_crosscheck)
+        .map { vcfs, _tbis, run_samples, _meta_run, run_crosscheck, _meta_database, database, _database_index, database_check, database_samples, database_crosscheck ->
+            [ [ id: 'fingerprint_database' ], run_samples, vcfs, haplotype_map_file, run_crosscheck, database, database_check, database_samples, database_crosscheck ]
         }
 
     FINGERPRINT_DATABASE_REPORT(ch_report_input)
@@ -299,9 +337,12 @@ workflow FINGERPRINTCHECK {
     crosscheck_metrics          = PICARD_CROSSCHECKFINGERPRINTS.out.crosscheck_metrics          // channel: [ meta, crosscheck_metrics.txt ]
     fingerprints                = ch_fingerprints                                               // channel: [ meta, vcf.gz, tbi ]
     database                    = ch_database                                                   // channel: [ meta, vcf.gz, tbi ]
-    database_crosscheck_metrics = PICARD_CROSSCHECKFINGERPRINTS_DATABASE.out.crosscheck_metrics // channel: [ meta, crosscheck_metrics.txt ]
+    database_check              = ch_database_check_results                                     // channel: [ meta, tsv ] (only with a given database)
+    database_crosscheck_metrics = ch_database_crosscheck_metrics                                // channel: [ meta, crosscheck_metrics.txt ] (only with kept database fingerprints)
     database_matches            = FINGERPRINT_DATABASE_REPORT.out.matches                       // channel: [ meta, tsv ]
+    database_fingerprints       = FINGERPRINT_DATABASE_REPORT.out.fingerprints                  // channel: [ meta, tsv ]
     database_summary            = FINGERPRINT_DATABASE_REPORT.out.summary                       // channel: [ meta, tsv ]
-    database_multiqc            = FINGERPRINT_DATABASE_REPORT.out.multiqc                       // channel: [ meta, _mqc.tsv or _mqc.html ]
+    database_multiqc            = FINGERPRINT_DATABASE_REPORT.out.overview
+        .mix(FINGERPRINT_DATABASE_REPORT.out.multiqc)                                           // channel: [ meta, _mqc.html or _mqc.tsv ]
     versions                    = ch_versions
 }

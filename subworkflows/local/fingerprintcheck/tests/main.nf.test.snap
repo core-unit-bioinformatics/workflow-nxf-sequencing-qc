@@ -2,15 +2,34 @@
     "run A without database": {
         "content": [
             [
-                [
-                    {
-                        "id": "fingerprint_database"
-                    },
-                    "fingerprint_database_summary.tsv:md5,cea02715c08b2000fcb3b18b3c0fd79a"
-                ]
+                "metric\tvalue",
+                "lod_threshold\t5",
+                "haplotype_map_file\thaplotype_map.txt",
+                "haplotype_map_snps\t100",
+                "haplotype_map_blocks\t100",
+                "run_samples\t2",
+                "run_samples_suitable\t2",
+                "run_samples_insufficient\t0",
+                "run_samples_no_coverage\t0",
+                "database_given\tno",
+                "database_file\t",
+                "database_compression\t",
+                "previous_database_samples\t0",
+                "replaced_fingerprints\t0",
+                "checked_database_samples\t0",
+                "checked_database_runs\t0",
+                "database_samples\t2",
+                "comparisons\t0",
+                "unexpected_match\t0",
+                "unexpected_mismatch\t0",
+                "expected_match\t0",
+                "inconclusive_same_sample\t0",
+                "inconclusive_other_sample\t0",
+                "expected_mismatch\t0",
+                "reported_comparisons\t0"
             ]
         ],
-        "timestamp": "2026-10-22T20:58:46.653757425",
+        "timestamp": "2026-10-23T17:40:33.742608564",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"
@@ -31,8 +50,43 @@
                     {
                         "id": "fingerprint_database"
                     },
-                    "fingerprint_database_summary.tsv:md5,840f80bb88e068800e57eeb91c70ede8"
+                    "fingerprint_database_fingerprints.tsv:md5,b11184210759131fa791048c38137da8"
                 ]
+            ],
+            [
+                [
+                    {
+                        "id": "previous_database"
+                    },
+                    "previous_database_check.tsv:md5,00b5156e7d049ef3f7590b389d56f57e"
+                ]
+            ],
+            [
+                "metric\tvalue",
+                "lod_threshold\t5",
+                "haplotype_map_file\thaplotype_map.txt",
+                "haplotype_map_snps\t100",
+                "haplotype_map_blocks\t100",
+                "run_samples\t4",
+                "run_samples_suitable\t4",
+                "run_samples_insufficient\t0",
+                "run_samples_no_coverage\t0",
+                "database_given\tyes",
+                "database_file\tprevious_database.vcf.gz",
+                "database_compression\tbgzip",
+                "previous_database_samples\t2",
+                "replaced_fingerprints\t0",
+                "checked_database_samples\t2",
+                "checked_database_runs\t1",
+                "database_samples\t6",
+                "comparisons\t8",
+                "unexpected_match\t1",
+                "unexpected_mismatch\t1",
+                "expected_match\t1",
+                "inconclusive_same_sample\t0",
+                "inconclusive_other_sample\t0",
+                "expected_mismatch\t5",
+                "reported_comparisons\t3"
             ],
             [
                 [
@@ -449,7 +503,7 @@
                 ]
             ]
         ],
-        "timestamp": "2026-10-23T17:03:36.227377901",
+        "timestamp": "2026-10-23T17:31:27.601691027",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

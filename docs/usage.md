@@ -53,14 +53,14 @@ Columns for the fingerprint check (`--enable_fingerprintcheck`, on by default):
 | Column  | Description                                                                                                                                                                                                                                                                                      |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `bam`   | Full path to the BAM/CRAM file of the sample, aligned to `--fasta`. Required for every row unless `--align_reads_for_fingerprint` is set; then rows without `bam` are aligned from `fastq_1`/`fastq_2` with bwa-mem2.                                                                            |
-| `runid` | RUNID of the sequencing run the sample comes from, e.g. `20251203_LH00535_0112_A22F5NWLT1`. Required for every row. Together with `sample` it identifies a fingerprint as `<sample>@<runid>`, because the same sample can be sequenced in several runs. Only `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`. |
+| `runid` | RUNID of the sequencing run the sample comes from, e.g. `20260101_LH00001_0001_AFIXTURE01`. Required for every row. Together with `sample` it identifies a fingerprint as `<sample>@<runid>`, because the same sample can be sequenced in several runs. Only `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`. |
 
 With the fingerprint check, `sample` may only contain `A-Z`, `a-z`, `0-9`, `.`, `_` and `-` (it becomes part of VCF sample and file names). Each sample may appear in only one `bam`/`runid` combination per samplesheet: rows of the same `sample` are merged and must agree on `bam` and `runid`.
 
 ```csv title="samplesheet.csv"
 sample,fastq_1,fastq_2,bam,runid
-765-25_1-T,765-25_1-T_R1.fq.gz,765-25_1-T_R2.fq.gz,765-25_1-T_tumor.bam,20251203_LH00535_0112_A22F5NWLT1
-765-25_3-N,765-25_3-N_R1.fq.gz,765-25_3-N_R2.fq.gz,765-25_3-N.bam,20251203_LH00535_0112_A22F5NWLT1
+SYN001_1-T,SYN001_1-T_R1.fq.gz,SYN001_1-T_R2.fq.gz,SYN001_1-T_tumor.bam,20260101_LH00001_0001_AFIXTURE01
+SYN001_3-N,SYN001_3-N_R1.fq.gz,SYN001_3-N_R2.fq.gz,SYN001_3-N.bam,20260101_LH00001_0001_AFIXTURE01
 ```
 
 Optional column for the VAF histogram:
@@ -99,7 +99,13 @@ The fingerprint check (`--enable_fingerprintcheck`, on by default) needs the Pic
 It runs two checks:
 
 1. **This run.** Picard CrosscheckFingerprints compares the BAMs of all samples of this run with each other (heatmap in the MultiQC report, unchanged from earlier versions). `--fingerprint_allow_duplicate_reads` (default `true`) controls whether duplicate reads are used here.
-2. **Fingerprint database.** Picard ExtractFingerprint writes one fingerprint VCF per sample with the sample name `<sample>@<runid>`. These are merged with the database of previous runs (`--fingerprint_database`, optional) into an updated database, and every sample of this run is compared with every fingerprint in it (CrosscheckFingerprints, `CROSSCHECK_BY SAMPLE`, `CROSSCHECK_MODE CHECK_ALL_OTHERS`). Comparisons with other runs are classified with the threshold T = `--fingerprint_database_lod_threshold` (default `5`):
+2. **Fingerprint database.** Picard ExtractFingerprint writes one fingerprint VCF per sample with the sample name `<sample>@<runid>`. If a database of previous runs is given (`--fingerprint_database`, optional), the steps are:
+   1. **Check.** The database is checked against `--fingerprint_haplotype_map` (`CHECK_FINGERPRINT_DATABASE`, see below). Fingerprints with the same `<sample>@<runid>` as a sample of this run are marked for replacement.
+   2. **Prepare.** `BCFTOOLS_VIEW_FINGERPRINT_DATABASE` keeps all other fingerprints and writes them as bgzipped VCF with a new tabix index. The database may be given as plain VCF, gzip or bgzip, with or without index; the index of the given file is not used. The given file itself is never modified.
+   3. **Crosscheck.** Every sample of this run is compared with every kept database fingerprint (`PICARD_CROSSCHECKFINGERPRINTS_DATABASE`: CrosscheckFingerprints, `CROSSCHECK_BY SAMPLE`, `CROSSCHECK_MODE CHECK_ALL_OTHERS`, this run as `INPUT`, the database as `SECOND_INPUT`). This happens _before_ this run is added, so no sample is compared with its own new fingerprint; comparisons within this run are covered by check 1.
+   4. **Update.** This run's fingerprints are added to the kept fingerprints (`BCFTOOLS_MERGE_FINGERPRINT_DATABASE`), see [Updated database](#updated-fingerprint-database).
+
+   Without `--fingerprint_database`, steps 1–3 are skipped and the updated database holds only this run's fingerprints. Comparisons with other runs are classified with the threshold T = `--fingerprint_database_lod_threshold` (default `5`):
 
    | LOD          | Same sample ID (expected match) | Different sample ID |
    | ------------ | ------------------------------- | ------------------- |
@@ -111,11 +117,34 @@ It runs two checks:
 
    Picard's own `RESULT` column is not used for this table: it treats every database sample as a different sample (the `@<runid>` part always differs) and calls any LOD above −T between different samples a match.
 
-The updated database is written to `fingerprintcheck/database/exomeqc_fingerprint_database.vcf.gz` (with `.tbi`). Pass it as `--fingerprint_database` to the next run so the database grows with every run. Keep the haplotype map and reference the same for all runs of one database. If a fingerprint ID of this run (`<sample>@<runid>`) is already in the given database, e.g. when a run is analysed again, its old fingerprint is replaced by the new one; this is logged as a `WARNING` and counted as `replaced_fingerprints`. The given database itself is never modified.
+The MultiQC section "Fingerprint check: overview" (`bin/fingerprint_database_report.py`) comes first and summarises the check: the haplotype map (number of SNPs and haplotype blocks; one SNP per block is compared), the database (file, number of fingerprints checked, number of runs), the replaced fingerprints, the counts of the comparison classes and the updated database. It also shows for every sample of this run whether its fingerprint is usable:
 
-The database must have been created by exomeqc (all sample names `<sample>@<runid>`) and needs a tabix (`.tbi`) or CSI index next to it; otherwise the pipeline stops with an `ERROR`.
+| Fingerprint    | Meaning                                                                                                                                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SUITABLE`     | Self LOD ≥ T: the LOD of the sample's BAM compared with itself (diagonal of the crosscheck heatmap) reaches the threshold, so a match with another fingerprint of the same person can be called.             |
+| `INSUFFICIENT` | Self LOD < T: too few informative reads at the haplotype map SNPs. Comparisons of this sample stay `INCONCLUSIVE`; a missing match is no evidence of a sample swap.                                           |
+| `NO_COVERAGE`  | No read at any haplotype block of the map, e.g. when the target regions do not cover the map's SNPs or the BAM is empty or of another reference.                                                             |
 
-If the database was built with another reference or haplotype map (different contig names), `PICARD_CROSSCHECKFINGERPRINTS_DATABASE` stops with `picard.PicardException: Failed to fingerprint` (`IndexOutOfBoundsException`). Check the `##contig` lines of the database (`bcftools view -h`) against the `.dict` of `--fasta`.
+The number of haplotype blocks with reads and the mean depth per sample are listed as well. Fingerprints that are not `SUITABLE` are logged as `WARNING`; they are still added to the database.
+
+#### Updated fingerprint database
+
+The updated database is written to `fingerprintcheck/database/exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` (with `.tbi`). The timestamp is the start time of the pipeline run (system time), so the databases of successive runs do not overwrite each other. Pass it as `--fingerprint_database` to the next run so the database grows with every run. Keep the haplotype map and reference the same for all runs of one database.
+
+> [!WARNING]
+> **Fingerprints with the same sample AND run ID are dropped and replaced.** If the given database already contains a fingerprint with the same `<sample>@<runid>` as a sample of this run (e.g. when a run is analysed again), that old fingerprint is **dropped** from the updated database and **replaced** by the new fingerprint of this run. The old fingerprint is not kept anywhere in the updated database and is not compared with this run. This is logged as a `WARNING`, listed in the overview section of the MultiQC report, marked `replace` in `fingerprintcheck/database/previous_database_samples.tsv` and counted as `replaced_fingerprints`. Fingerprints of the same sample from _other_ runs are kept. Keep the given database file if the old fingerprints may be needed again.
+
+#### Check of the given database
+
+`CHECK_FINGERPRINT_DATABASE` (`bin/check_fingerprint_database.py`, PyVCF) reads the whole database and stops the pipeline with an `ERROR` that names the file, the record and the expected and observed values unless:
+
+- all sample names are unique and of the form `<sample>@<runid>` (i.e. the database was created by exomeqc);
+- every `##contig` of the VCF header is in the sequence dictionary (`@SQ` lines) of the haplotype map, with the same length;
+- `FORMAT/PL` (genotype likelihoods, read by Picard) is defined and every genotype has 3 PL values or is missing;
+- every record is an SNP of the haplotype map, at the same position and with the same two alleles (`REF`/`ALT` = `MAJOR_ALLELE`/`MINOR_ALLELE` in either order);
+- every haplotype block of the map is present exactly once (Picard ExtractFingerprint writes one representative SNP per block, also when it has no reads).
+
+A database built with another haplotype map, genome build or contig naming therefore stops the run before any comparison is made. Start a new database (omit `--fingerprint_database`) when the haplotype map or the reference changes.
 
 Samples without `bam` can be aligned with bwa-mem2 for the fingerprint check (off by default):
 
@@ -125,7 +154,8 @@ Samples without `bam` can be aligned with bwa-mem2 for the fingerprint check (of
 
 Without `--bwamem2_index`, the index is built from `--fasta`; for a human genome this needs about 64 GB of memory and several hours. The aligned BAMs are only used for the fingerprints and are not published. `--fasta_fai` and `--fasta_dict` are created from `--fasta` if not given. The FASTA must be uncompressed.
 
-Tested inputs: Picard 3.4.0 (CrosscheckFingerprints) and 3.5.0 (ExtractFingerprint), bcftools 1.23.1, bwa-mem2 2.3 (conda package; the binary reports 2.2.1) on the synthetic test data in `tests/fixtures/fingerprint/` (see `make_fingerprint_fixtures.py`).
+Tested inputs: Picard 3.4.0 (CrosscheckFingerprints) and 3.5.0 (ExtractFingerprint), bcftools 1.23.1, bwa-mem2 2.3 (conda package; the binary reports 2.2.1), PyVCF3 1.0.4 on the synthetic test data in `tests/fixtures/fingerprint/` (see `make_fingerprint_fixtures.py`), with the database given as bgzip with index and as plain VCF without index (nf-test), and as plain VCF, gzip and bgzip (pytest). The real haplotype map (e.g. Broad's `Homo_sapiens_assembly38.haplotype_database.txt`) was not tested here.
+
 To name the MultiQC report after the run, add e.g.:
 
 ```bash

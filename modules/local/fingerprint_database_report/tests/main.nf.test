@@ -9,19 +9,46 @@ nextflow_process {
     tag "modules_local"
     tag "fingerprint_database_report"
 
-    test("synthetic fixtures - run B vs database with run A") {
+    // Synthetic fixtures, see tests/fixtures/fingerprint/make_fingerprint_fixtures.py:
+    // run B (SYN001_3-N, SYN002_1-T, SYN003_1-T) against the database of run A.
+
+    setup {
+        run("CHECK_FINGERPRINT_DATABASE") {
+            script "../../check_fingerprint_database/main.nf"
+            process {
+                """
+                def check_fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                input[0] = [ [ id:'previous_database' ], file("\${check_fixtures}/report/previous_database.vcf.gz", checkIfExists: true) ]
+                input[1] = file("\${check_fixtures}/haplotype_map.txt", checkIfExists: true)
+                input[2] = file("\${check_fixtures}/report/run_fingerprint_ids.txt", checkIfExists: true)
+                """
+            }
+        }
+    }
+
+    test("run B vs database of run A") {
 
         when {
             process {
                 """
-                def fixtures = "${projectDir}/tests/fixtures/fingerprint/report"
-                input[0] = [
-                    [ id:'fingerprint_database' ],
-                    file("\${fixtures}/fingerprint_database.crosscheck_metrics.txt", checkIfExists: true),
-                    file("\${fixtures}/run_samples.tsv", checkIfExists: true),
-                    file("\${fixtures}/database.vcf.gz", checkIfExists: true),
-                    file("\${fixtures}/previous_database.vcf.gz", checkIfExists: true)
-                ]
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                def report = "\${fixtures}/report"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                input[0] = CHECK_FINGERPRINT_DATABASE.out.check
+                    .join(CHECK_FINGERPRINT_DATABASE.out.samples)
+                    .map { _meta, check, samples ->
+                        [
+                            [ id:'fingerprint_database' ],
+                            file("\${report}/run_samples.tsv", checkIfExists: true),
+                            [ 'SYN001_3-N', 'SYN002_1-T', 'SYN003_1-T' ].collect { sample -> file("\${report}/\${sample}_\${run_b}.fingerprint.vcf.gz", checkIfExists: true) },
+                            file("\${fixtures}/haplotype_map.txt", checkIfExists: true),
+                            file("\${report}/crosscheck.crosscheck_metrics.txt", checkIfExists: true),
+                            file("\${report}/database.vcf.gz", checkIfExists: true),
+                            check,
+                            samples,
+                            file("\${report}/fingerprint_database.crosscheck_metrics.txt", checkIfExists: true)
+                        ]
+                    }
                 """
             }
         }
@@ -31,10 +58,14 @@ nextflow_process {
                 { assert process.success },
                 // the three classes of the fixture design are reported, unexpected results first
                 { assert path(process.out.matches[0][1]).readLines().collect { line -> line.split('\t')[4] } == ['status', 'UNEXPECTED_MATCH', 'UNEXPECTED_MISMATCH', 'EXPECTED_MATCH'] },
+                { assert path(process.out.fingerprints[0][1]).readLines()[1..-1].every { line -> line.endsWith('\tSUITABLE') } },
                 { assert file(process.out.multiqc[0][1]).name == 'fingerprint_database_matches_mqc.tsv' },
+                { assert path(process.out.overview[0][1]).text.contains('compared with 2 fingerprints of 1 other runs') },
                 { assert snapshot(
                     process.out.matches,
+                    process.out.fingerprints,
                     process.out.summary,
+                    process.out.overview,
                     process.out.multiqc,
                     process.out.findAll { key, val -> key.startsWith('versions') }
                 ).match() }
@@ -42,17 +73,24 @@ nextflow_process {
         }
     }
 
-    test("synthetic fixtures - no previous database") {
+    test("error - updated database without the database check") {
 
         when {
             process {
                 """
-                def fixtures = "${projectDir}/tests/fixtures/fingerprint/report"
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                def report = "\${fixtures}/report"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                // database.vcf.gz holds run A, which no database check accounts for
                 input[0] = [
                     [ id:'fingerprint_database' ],
-                    file("\${fixtures}/fingerprint_database.crosscheck_metrics.txt", checkIfExists: true),
-                    file("\${fixtures}/run_samples.tsv", checkIfExists: true),
-                    file("\${fixtures}/database.vcf.gz", checkIfExists: true),
+                    file("\${report}/run_samples.tsv", checkIfExists: true),
+                    [ 'SYN001_3-N', 'SYN002_1-T', 'SYN003_1-T' ].collect { sample -> file("\${report}/\${sample}_\${run_b}.fingerprint.vcf.gz", checkIfExists: true) },
+                    file("\${fixtures}/haplotype_map.txt", checkIfExists: true),
+                    file("\${report}/crosscheck.crosscheck_metrics.txt", checkIfExists: true),
+                    file("\${report}/database.vcf.gz", checkIfExists: true),
+                    [],
+                    [],
                     []
                 ]
                 """
@@ -60,27 +98,32 @@ nextflow_process {
         }
 
         then {
-            // without a previous database the database must contain only this run's samples
             assertAll(
                 { assert process.failed },
-                { assert process.exitStatus == 1 }
+                { assert process.exitStatus == 1 },
+                { assert (process.stdout + process.stderr).join('\n').contains('database content differs from the kept fingerprints + this run') }
             )
         }
     }
 
-    test("synthetic fixtures - stub") {
+    test("run B vs database of run A - stub") {
 
         options "-stub"
 
         when {
             process {
                 """
-                def fixtures = "${projectDir}/tests/fixtures/fingerprint/report"
+                def fixtures = "${projectDir}/tests/fixtures/fingerprint"
+                def report = "\${fixtures}/report"
                 input[0] = [
                     [ id:'fingerprint_database' ],
-                    file("\${fixtures}/fingerprint_database.crosscheck_metrics.txt", checkIfExists: true),
-                    file("\${fixtures}/run_samples.tsv", checkIfExists: true),
-                    file("\${fixtures}/database.vcf.gz", checkIfExists: true),
+                    file("\${report}/run_samples.tsv", checkIfExists: true),
+                    [ file("\${report}/SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz", checkIfExists: true) ],
+                    file("\${fixtures}/haplotype_map.txt", checkIfExists: true),
+                    file("\${report}/crosscheck.crosscheck_metrics.txt", checkIfExists: true),
+                    file("\${report}/database.vcf.gz", checkIfExists: true),
+                    [],
+                    [],
                     []
                 ]
                 """
