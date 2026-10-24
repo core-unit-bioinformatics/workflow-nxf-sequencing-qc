@@ -44,6 +44,13 @@
                     "type": "string",
                     "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
                     "fa_icon": "fas fa-file-signature"
+                },
+                "multiqc_report_name": {
+                    "type": "string",
+                    "description": "File name of the MultiQC report, without `.html`, e.g. the run ID. The report is written to `multiqc/<name>.html`, its data to `multiqc/<name>_data/` and its plots to `multiqc/<name>_plots/`.",
+                    "help_text": "Allowed characters: `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`; the name must start with a letter or digit and must not end in `.html`. If not set, MultiQC names the report `multiqc_report.html`, or `<title>_multiqc_report.html` with `--multiqc_title`.",
+                    "pattern": "^(?!.*\\.html$)[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "fa_icon": "fas fa-file-signature"
                 }
             }
         },
