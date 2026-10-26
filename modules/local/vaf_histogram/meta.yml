@@ -16,10 +16,13 @@ tools:
       identifier: ""
 
 input:
-  - vcfs:
-      type: file
-      description: Small-variant VCFs (plain or gzipped), e.g. DRAGEN `*.hard-filtered.vcf.gz`; one histogram per VCF sample column
-      pattern: "*.{vcf,vcf.gz}"
+  - - samples:
+        type: list
+        description: Samplesheet sample names, one per VCF, in the same order as `vcfs`
+    - vcfs:
+        type: file
+        description: Small-variant VCF (plain or gzipped, any caller) of each sample; one histogram per counted VCF column
+        pattern: "*.{vcf,vcf.gz}"
 
 output:
   tsv:

@@ -9,14 +9,15 @@ nextflow_pipeline {
     // The samplesheet and the MultiQC input list are written into the test's
     // output directory, because their paths must be absolute.
 
-    test("VAF histogram section in the MultiQC report") {
+    test("VCFs from the samplesheet - section in the MultiQC report") {
 
         when {
             params {
-                def fixtures = new File("${projectDir}/tests/fixtures/vaf_histogram")
+                def vcfs = "${projectDir}/tests/fixtures/vaf_histogram/vcf"
+                // tumor with a DRAGEN tumor/normal VCF, normal without VCF, germline FreeBayes VCF
                 def samplesheet = new File("${outputDir}/samplesheet.csv")
                 samplesheet.parentFile.mkdirs()
-                samplesheet.text = "sample\nVAFT01\n"
+                samplesheet.text = "sample,vcf\nVAFT01,${vcfs}/VAFT01.dragen.vcf.gz\nVAFN01,\nVAFG03,${vcfs}/VAFG03.freebayes.vcf.gz\n"
                 // an empty directory, so MultiQC finds only the pipeline's own files
                 def multiqc_dir = new File("${outputDir}/multiqc_inputs")
                 multiqc_dir.mkdirs()
@@ -32,33 +33,30 @@ nextflow_pipeline {
                 enable_fastqscreen         = false
                 enable_fingerprintcheck    = false
                 enable_cnvqc               = false
-                dragen_dirs                = "${fixtures}/dragen/"
-                vaf_histogram_sample_regex = '-T$'
+                vaf_histogram_sample_regex = '-T$|^VAFG'
             }
         }
 
         then {
+            def summary = new File("${outputDir}/results/vaf-histogram/vaf_histogram_summary.tsv").readLines()[1..-1].collect { line -> line.split('\t') }
             def multiqc_data = new File("${outputDir}/results/multiqc/Exome-Sequencing_multiqc_report_data")
             assertAll(
                 { assert workflow.success },
-                { assert new File("${outputDir}/results/vaf-histogram/vaf_histogram.tsv").exists() },
-                { assert new File("${outputDir}/results/vaf-histogram/vaf_histogram_summary.tsv").exists() },
-                // MultiQC parsed one dataset per tumor sample
+                // one histogram per sample with a VCF, VAF source chosen per VCF
+                { assert summary.collect { row -> [ row[0], row[1], row[3] ] } == [ [ 'VAFG03', 'VAFG03', 'FORMAT_AD' ], [ 'VAFT01', 'VAFT01-T', 'FORMAT_AF' ] ] },
                 { assert multiqc_data.list().findAll { name -> name.startsWith('multiqc_exomeqc_vaf_histogram_plot') }.size() == 2 },
                 { assert path("${outputDir}/results/multiqc/Exome-Sequencing_multiqc_report.html").text.contains('Variant allele fraction') }
             )
         }
     }
 
-    test("error - no VCF matches the glob") {
+    test("error - no sample has a VCF") {
 
         when {
             params {
-                def fixtures = new File("${projectDir}/tests/fixtures/vaf_histogram")
                 def samplesheet = new File("${outputDir}/samplesheet.csv")
                 samplesheet.parentFile.mkdirs()
                 samplesheet.text = "sample\nVAFT01\n"
-                // an empty directory, so MultiQC finds only the pipeline's own files
                 def multiqc_dir = new File("${outputDir}/multiqc_inputs")
                 multiqc_dir.mkdirs()
                 def multiqc_list = new File("${outputDir}/multiqc_inputs.csv")
@@ -72,15 +70,45 @@ nextflow_pipeline {
                 enable_fastqscreen      = false
                 enable_fingerprintcheck = false
                 enable_cnvqc            = false
-                dragen_dirs             = "${fixtures}/dragen"
-                vaf_histogram_vcf_glob  = '**.no-such-file.vcf.gz'
             }
         }
 
         then {
             assertAll(
                 { assert workflow.failed },
-                { assert (workflow.stdout + workflow.stderr).any { line -> line.contains('no-such-file.vcf.gz') } }
+                { assert (workflow.stdout + workflow.stderr).any { line -> line.contains("no sample in the samplesheet has a 'vcf'") } }
+            )
+        }
+    }
+
+    test("error - rows of a sample with different VCFs") {
+
+        when {
+            params {
+                def vcfs = "${projectDir}/tests/fixtures/vaf_histogram/vcf"
+                def samplesheet = new File("${outputDir}/samplesheet.csv")
+                samplesheet.parentFile.mkdirs()
+                samplesheet.text = "sample,vcf\nVAFT01,${vcfs}/VAFT01.dragen.vcf.gz\nVAFT01,${vcfs}/VAFT02.mutect2.vcf.gz\n"
+                def multiqc_dir = new File("${outputDir}/multiqc_inputs")
+                multiqc_dir.mkdirs()
+                def multiqc_list = new File("${outputDir}/multiqc_inputs.csv")
+                multiqc_list.text = "paths\n${multiqc_dir}\n"
+
+                input                   = samplesheet.path
+                multiqc_inputs          = multiqc_list.path
+                outdir                  = "${outputDir}/results"
+                genome                  = null
+                igenomes_ignore         = true
+                enable_fastqscreen      = false
+                enable_fingerprintcheck = false
+                enable_cnvqc            = false
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.failed },
+                { assert (workflow.stdout + workflow.stderr).any { line -> line.contains("All rows of a sample must have the same 'vcf'") && line.contains('VAFT01') } }
             )
         }
     }

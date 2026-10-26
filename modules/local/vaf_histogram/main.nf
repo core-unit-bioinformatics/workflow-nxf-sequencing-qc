@@ -7,7 +7,8 @@ process VAF_HISTOGRAM {
         'biocontainers/python:3.12' }"
 
     input:
-    path(vcfs, stageAs: 'vcfs/*')
+    // one VCF per sample, in the same order; staged in numbered folders so equal file names do not collide
+    tuple val(samples), path(vcfs, stageAs: 'vcf*/*')
 
     output:
     path("${task.ext.prefix ?: 'vaf_histogram'}.tsv")        , emit: tsv
@@ -21,11 +22,13 @@ process VAF_HISTOGRAM {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: 'vaf_histogram'
+    // pair every sample with its VCF: --input SAMPLE VCF
+    def inputs = [ samples, vcfs instanceof List ? vcfs : [ vcfs ] ].transpose().collect { sample, vcf -> "--input '${sample}' '${vcf}'" }.join(' ')
     """
-    # count the variants per VAF bin of every VCF sample; \$args carries the
-    # bin width, sample regex and filter option from conf/modules.config
+    # count the variants per VAF bin of every sample's VCF; \$args carries the
+    # VAF source, bin width, sample regex and filter option from conf/modules.config
     vaf_histogram.py \\
-        --vcf ${vcfs} \\
+        ${inputs} \\
         --prefix ${prefix} \\
         ${args}
     """

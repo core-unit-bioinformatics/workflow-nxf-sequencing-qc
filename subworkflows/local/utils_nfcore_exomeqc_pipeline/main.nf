@@ -181,6 +181,12 @@ def validateInputSamplesheet(input) {
         error("Please check input samplesheet -> Multiple runs of a sample must be of the same datatype i.e. single-end or paired-end: ${metas[0].id}")
     }
 
+    // Check that all rows of a sample give the same VCF (or none), so no VCF is dropped silently
+    def vcfs = metas.collect { meta -> meta.vcf ? meta.vcf.toString() : '' }.unique()
+    if (vcfs.size() > 1) {
+        error("Please check input samplesheet -> All rows of a sample must have the same 'vcf' (or leave it empty in all rows): sample ${metas[0].id} has ${vcfs.collect { vcf -> vcf ?: '<empty>' }.join(', ')}")
+    }
+
     return [ metas[0], fastqs ]
 }
 //

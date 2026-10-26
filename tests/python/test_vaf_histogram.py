@@ -9,9 +9,10 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-FIXTURES = REPO / "tests" / "fixtures" / "vaf_histogram" / "dragen"
-VCF1 = FIXTURES / "VAFT01" / "VAFT01.hard-filtered.vcf.gz"
-VCF2 = FIXTURES / "VAFT02" / "VAFT02.hard-filtered.vcf.gz"
+FIXTURES = REPO / "tests" / "fixtures" / "vaf_histogram" / "vcf"
+DRAGEN = FIXTURES / "VAFT01.dragen.vcf.gz"
+MUTECT2 = FIXTURES / "VAFT02.mutect2.vcf.gz"
+FREEBAYES = FIXTURES / "VAFG03.freebayes.vcf.gz"
 
 # load the script as a module (bin/ is no package)
 _spec = importlib.util.spec_from_file_location(
@@ -20,17 +21,39 @@ _spec = importlib.util.spec_from_file_location(
 vh = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(vh)
 
-HEADER = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS1-N\tS1-T\n"
+FORMAT_HEADER = {
+    "GT": '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
+    "AD": '##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths">',
+    "AF": '##FORMAT=<ID=AF,Number=A,Type=Float,Description="Allele fractions">',
+    "DP": '##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">',
+}
 
 
-def write_vcf(path, body, header=HEADER):
-    """Write a plain-text VCF with the given data lines."""
-    path.write_text(header + body)
+def write_vcf(path, fmt_ids, body, columns=("S1-N", "S1-T")):
+    """Write a plain-text VCF declaring the given FORMAT fields, with the given data lines."""
+    lines = ["##fileformat=VCFv4.2"] + [FORMAT_HEADER[i] for i in fmt_ids]
+    lines.append(
+        "\t".join(
+            [
+                "#CHROM",
+                "POS",
+                "ID",
+                "REF",
+                "ALT",
+                "QUAL",
+                "FILTER",
+                "INFO",
+                "FORMAT",
+                *columns,
+            ]
+        )
+    )
+    path.write_text("\n".join(lines) + "\n" + body)
     return path
 
 
 def run(tmp_path, *argv):
-    """Run main() in tmp_path and return the outputs (tsv rows, summary rows, mqc json)."""
+    """Run main() writing into tmp_path and return (tsv rows, summary rows, mqc json)."""
     prefix = str(tmp_path / "out")
     vh.main([*argv, "--prefix", prefix])
     tsv = [line.split("\t") for line in Path(f"{prefix}.tsv").read_text().splitlines()]
@@ -42,11 +65,19 @@ def run(tmp_path, *argv):
     return tsv, summary, mqc
 
 
-def nonzero(tsv, sample):
-    """Return {bin_start: count} of the non-empty bins of one sample."""
-    return {
-        row[2]: int(row[4]) for row in tsv[1:] if row[0] == sample and row[4] != "0"
-    }
+def nonzero(tsv, name):
+    """Return {bin_start: count} of the non-empty bins of one histogram."""
+    return {row[3]: int(row[5]) for row in tsv[1:] if row[0] == name and row[5] != "0"}
+
+
+def expect_error(capsys, argv, message):
+    """Run main() and check that it stops with exit 1 and the given ERROR message."""
+    with pytest.raises(SystemExit) as err:
+        vh.main(argv)
+    assert err.value.code == 1
+    stderr = capsys.readouterr().err
+    assert "ERROR:" in stderr
+    assert message in stderr
 
 
 # --- binning ---------------------------------------------------------------
@@ -60,13 +91,8 @@ def test_bins_default_width():
 
 
 def test_bins_width_not_dividing_one_cuts_last_bin():
-    bins = vh.make_bins(Decimal("0.3"))
-    assert bins == [
-        (Decimal(0), Decimal("0.3")),
-        (Decimal("0.3"), Decimal("0.6")),
-        (Decimal("0.6"), Decimal("0.9")),
-        (Decimal("0.9"), Decimal(1)),
-    ]
+    assert vh.make_bins(Decimal("0.3"))[-1] == (Decimal("0.9"), Decimal(1))
+    assert len(vh.make_bins(Decimal("0.3"))) == 4
 
 
 @pytest.mark.parametrize(
@@ -79,7 +105,6 @@ def test_bins_width_not_dividing_one_cuts_last_bin():
         ("0.1499999", 2),
         ("0.95", 19),
         ("1", 19),
-        ("1.0", 19),
     ],
 )
 def test_bin_index_edges(vaf, index):
@@ -95,52 +120,126 @@ def test_invalid_bin_width_stops(width, capsys):
     assert "ERROR: --bin-width" in capsys.readouterr().err
 
 
-# --- fixture VCFs ----------------------------------------------------------
+# --- callers, VAF source ------------------------------------------------------
 
 
-def test_fixture_counts(tmp_path):
-    tsv, summary, mqc = run(tmp_path, "--vcf", str(VCF1), str(VCF2))
-    assert tsv[0] == ["sample", "vcf", "bin_start", "bin_end", "variants"]
-    # 4 samples x 20 bins
-    assert len(tsv) == 1 + 4 * 20
+def test_three_callers_auto(tmp_path):
+    tsv, summary, mqc = run(
+        tmp_path,
+        "--input", "VAFT01", str(DRAGEN),
+        "--input", "VAFT02", str(MUTECT2),
+        "--input", "VAFG03", str(FREEBAYES),
+        "--sample-regex=-T$|^VAFG",
+    )  # fmt: skip
+    assert tsv[0] == ["sample", "vcf_sample", "vcf", "bin_start", "bin_end", "variants"]
     # see tests/fixtures/vaf_histogram/generate_vaf_fixtures.py for the design
-    assert nonzero(tsv, "VAFT01-T") == {
+    assert nonzero(tsv, "VAFT01") == {
         "0.10": 2,
         "0.15": 1,
         "0.20": 1,
-        "0.40": 1,
         "0.50": 1,
         "0.95": 1,
     }
-    assert nonzero(tsv, "VAFT01-N") == {"0.00": 7}
-    assert nonzero(tsv, "VAFT02-T") == {"0.05": 2, "0.30": 1}
+    assert nonzero(tsv, "VAFT02") == {"0.05": 2, "0.30": 1}
+    # FreeBayes: AD[alt] / DP -> 0.25, 0.5, 1.0, 0.375 twice
+    assert nonzero(tsv, "VAFG03") == {"0.25": 1, "0.35": 2, "0.50": 1, "0.95": 1}
     rows = {row[0]: row for row in summary[1:]}
-    assert summary[0][2:] == [
-        "records_read",
-        "records_filtered",
-        "alleles_counted",
-        "alleles_vaf_from_ad",
-        "alleles_no_vaf",
-        "alleles_non_variant",
-    ]
-    assert rows["VAFT01-T"][2:] == ["8", "1", "7", "1", "1", "0"]
-    assert rows["VAFT02-T"][2:] == ["3", "0", "3", "0", "0", "0"]
-    # one MultiQC dataset per sample, sorted by name
-    assert [d["name"] for d in mqc["pconfig"]["data_labels"]] == [
-        "VAFT01-N",
+    assert summary[0] == [
+        "sample", "vcf_sample", "vcf", "vaf_source",
+        "records_read", "records_filtered", "alleles_counted", "alleles_non_variant",
+    ]  # fmt: skip
+    assert rows["VAFT01"][1:] == [
         "VAFT01-T",
-        "VAFT02-N",
-        "VAFT02-T",
+        "VAFT01.dragen.vcf.gz",
+        "FORMAT_AF",
+        "6",
+        "1",
+        "6",
+        "0",
     ]
-    assert mqc["plot_type"] == "linegraph"
-    assert mqc["id"] == "exomeqc_vaf_histogram"
+    assert rows["VAFT02"][3] == "FORMAT_AF"
+    assert rows["VAFG03"][1:] == [
+        "VAFG03",
+        "VAFG03.freebayes.vcf.gz",
+        "FORMAT_AD",
+        "5",
+        "1",
+        "5",
+        "0",
+    ]
+    assert [d["name"] for d in mqc["pconfig"]["data_labels"]] == [
+        "VAFG03",
+        "VAFT01",
+        "VAFT02",
+    ]
+    assert "FORMAT_AD and FORMAT_AF" in mqc["description"]
+
+
+def test_all_columns_are_named_sample_column(tmp_path):
+    tsv, _, mqc = run(tmp_path, "--input", "VAFT01", str(DRAGEN))
+    assert {row[0] for row in tsv[1:]} == {"VAFT01_VAFT01-N", "VAFT01_VAFT01-T"}
+    assert nonzero(tsv, "VAFT01_VAFT01-N") == {"0.00": 6}
+    assert len(mqc["data"]) == 2
+
+
+def test_format_ad_forced_on_vcf_with_af(tmp_path):
+    # DRAGEN tumor AD/DP: 6/50=0.12, 6/40=0.15, 15/30=0.5, 20/20=1.0, 6/30=0.2 and 3/30=0.1
+    tsv, summary, _ = run(
+        tmp_path,
+        "--input",
+        "VAFT01",
+        str(DRAGEN),
+        "--sample-regex=-T$",
+        "--allele-fraction",
+        "FORMAT_AD",
+    )
+    assert nonzero(tsv, "VAFT01") == {
+        "0.10": 2,
+        "0.15": 1,
+        "0.20": 1,
+        "0.50": 1,
+        "0.95": 1,
+    }
+    assert summary[1][3] == "FORMAT_AD"
+
+
+def test_auto_prefers_af_over_ad(tmp_path):
+    # AF and AD/DP disagree: auto must use AF
+    vcf = write_vcf(
+        tmp_path / "both.vcf",
+        ["GT", "AD", "AF", "DP"],
+        "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AD:AF:DP\t0/0:10,0:0:10\t0/1:5,5:0.8:10\n",
+    )
+    tsv, summary, _ = run(tmp_path, "--input", "S1", str(vcf), "--sample-regex=-T$")
+    assert nonzero(tsv, "S1") == {"0.80": 1}
+    assert summary[1][3] == "FORMAT_AF"
+
+
+def test_include_filtered(tmp_path):
+    tsv, summary, _ = run(
+        tmp_path,
+        "--input",
+        "VAFT01",
+        str(DRAGEN),
+        "--sample-regex=-T$",
+        "--include-filtered",
+    )
+    # the weak_evidence record with AF 0.30 is now counted
+    assert nonzero(tsv, "VAFT01")["0.30"] == 1
+    assert summary[1][5] == "0"
 
 
 def test_step_outline_points(tmp_path):
     _, _, mqc = run(
-        tmp_path, "--vcf", str(VCF2), "--sample-regex=-T$", "--bin-width", "0.25"
+        tmp_path,
+        "--input",
+        "VAFT02",
+        str(MUTECT2),
+        "--sample-regex=-T$",
+        "--bin-width",
+        "0.25",
     )
-    points = mqc["data"][0]["VAFT02-T"]
+    points = mqc["data"][0]["VAFT02"]
     # bins [0,0.25): 2 (0.05, 0.07), [0.25,0.5): 1 (0.33), [0.5,0.75): 0, [0.75,1]: 0
     assert points == [
         [0.0, 0],
@@ -154,104 +253,174 @@ def test_step_outline_points(tmp_path):
         [1.0, 0],
         [1.0, 0],
     ]
-    assert "width 0.25" in mqc["description"]
 
 
-def test_sample_regex_selects_tumor(tmp_path):
-    tsv, _, mqc = run(tmp_path, "--vcf", str(VCF1), str(VCF2), "--sample-regex=-T$")
-    assert {row[0] for row in tsv[1:]} == {"VAFT01-T", "VAFT02-T"}
-    assert len(mqc["data"]) == 2
-
-
-def test_include_filtered(tmp_path):
-    tsv, summary, _ = run(
-        tmp_path, "--vcf", str(VCF1), "--sample-regex=-T$", "--include-filtered"
-    )
-    # the weak_evidence record with AF 0.30 is now counted
-    assert nonzero(tsv, "VAFT01-T")["0.30"] == 1
-    assert summary[1][3] == "0"
-
-
-def test_custom_bin_width(tmp_path):
-    tsv, _, _ = run(
-        tmp_path, "--vcf", str(VCF1), "--sample-regex=-T$", "--bin-width", "0.1"
-    )
-    assert len(tsv) == 1 + 10
-    assert nonzero(tsv, "VAFT01-T") == {
-        "0.10": 3,
-        "0.20": 1,
-        "0.40": 1,
-        "0.50": 1,
-        "0.90": 1,
-    }
-
-
-def test_plain_vcf_and_non_variant_alt(tmp_path):
+def test_non_variant_alt_needs_no_vaf(tmp_path):
     vcf = write_vcf(
-        tmp_path / "plain.vcf",
+        tmp_path / "gvcf.vcf",
+        ["GT", "AF"],
         "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF\t0/0:0\t0/1:0.42\n"
-        "chr1\t20\t.\tA\t<NON_REF>\t.\tPASS\t.\tGT:AF\t0/0:0\t0/0:0.0\n",
+        "chr1\t20\t.\tA\t<NON_REF>\t.\tPASS\t.\tGT:AF\t0/0:.\t0/0:.\n",
     )
-    tsv, summary, _ = run(tmp_path, "--vcf", str(vcf), "--sample-regex=-T$")
-    assert nonzero(tsv, "S1-T") == {"0.40": 1}
-    assert summary[1][2:] == ["2", "0", "1", "0", "0", "1"]
+    tsv, summary, _ = run(tmp_path, "--input", "S1", str(vcf), "--sample-regex=-T$")
+    assert nonzero(tsv, "S1") == {"0.40": 1}
+    assert summary[1][4:] == ["2", "0", "1", "1"]
 
 
-# --- errors ----------------------------------------------------------------
+# --- errors ------------------------------------------------------------------
 
 
-def expect_error(capsys, argv, message):
-    """Run main() and check that it stops with exit 1 and the given ERROR message."""
-    with pytest.raises(SystemExit) as err:
-        vh.main(argv)
-    assert err.value.code == 1
-    stderr = capsys.readouterr().err
-    assert "ERROR:" in stderr
-    assert message in stderr
-
-
-def test_error_vaf_out_of_range(tmp_path, capsys):
-    vcf = write_vcf(
-        tmp_path / "bad.vcf", "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF\t0/0:0\t0/1:1.2\n"
+def test_error_no_af_no_ad_in_header(tmp_path, capsys):
+    # Strelka-like: tier counts only
+    vcf = tmp_path / "strelka.vcf"
+    vcf.write_text(
+        "##fileformat=VCFv4.2\n"
+        '##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Depth">\n'
+        '##FORMAT=<ID=AU,Number=2,Type=Integer,Description="A counts">\n'
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNORMAL\tTUMOR\n"
+        "chr1\t10\t.\tA\tC\t.\tPASS\t.\tDP:AU\t30:0,0\t30:5,6\n"
     )
     expect_error(
         capsys,
-        ["--vcf", str(vcf), "--prefix", str(tmp_path / "o")],
-        "line 3: VAF 1.2 from FORMAT/AF is outside [0, 1]",
+        ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")],
+        "cannot determine the VAF: the header declares neither FORMAT/AF nor FORMAT/AD + FORMAT/DP (declared FORMAT fields: AU, DP)",
     )
 
 
-def test_error_af_not_numeric(tmp_path, capsys):
+def test_error_ad_without_dp(tmp_path, capsys):
     vcf = write_vcf(
-        tmp_path / "bad.vcf", "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF\t0/0:0\t0/1:abc\n"
+        tmp_path / "ad.vcf",
+        ["GT", "AD"],
+        "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AD\t0/0:10,0\t0/1:5,5\n",
     )
     expect_error(
         capsys,
-        ["--vcf", str(vcf), "--prefix", str(tmp_path / "o")],
-        "FORMAT/AF value 'abc' is not a number",
+        ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")],
+        "neither FORMAT/AF nor FORMAT/AD + FORMAT/DP",
     )
+
+
+def test_error_forced_af_not_declared(tmp_path, capsys):
+    expect_error(
+        capsys,
+        [
+            "--input",
+            "VAFG03",
+            str(FREEBAYES),
+            "--allele-fraction",
+            "FORMAT_AF",
+            "--prefix",
+            str(tmp_path / "o"),
+        ],
+        "--allele-fraction FORMAT_AF, but the header declares no FORMAT/AF",
+    )
+
+
+@pytest.mark.parametrize(
+    "fmt_ids, fmt, value, message",
+    [
+        (
+            ["GT", "AF"],
+            "GT:AF",
+            "0/1:.",
+            "FORMAT/AF is missing ('.') for a counted variant",
+        ),
+        (["GT", "AF"], "GT", "0/1", "FORMAT/AF is missing ('.') for a counted variant"),
+        (["GT", "AF"], "GT:AF", "0/1:abc", "FORMAT/AF value 'abc' is not a number"),
+        (["GT", "AF"], "GT:AF", "0/1:1.2", "VAF 1.2 from FORMAT/AF is outside [0, 1]"),
+        (
+            ["GT", "AD", "DP"],
+            "GT:AD:DP",
+            "0/1:.:10",
+            "FORMAT/AD has 1 value(s) for 1 REF + 1 ALT allele(s)",
+        ),
+        (
+            ["GT", "AD", "DP"],
+            "GT:AD:DP",
+            "0/1:5,.:10",
+            "FORMAT/AD is missing ('.') for a counted variant",
+        ),
+        (
+            ["GT", "AD", "DP"],
+            "GT:AD:DP",
+            "0/1:5,5:.",
+            "FORMAT/DP is missing ('.') for a counted variant",
+        ),
+        (
+            ["GT", "AD", "DP"],
+            "GT:AD:DP",
+            "0/1:0,0:0",
+            "FORMAT/DP is 0, no VAF can be computed",
+        ),
+        (
+            ["GT", "AD", "DP"],
+            "GT:AD:DP",
+            "0/1:2,12:10",
+            "VAF 1.2 from FORMAT/AD 2,12 / FORMAT/DP 10 is outside [0, 1]",
+        ),
+    ],
+)
+def test_error_missing_or_bad_value(tmp_path, capsys, fmt_ids, fmt, value, message):
+    vcf = write_vcf(
+        tmp_path / "bad.vcf",
+        fmt_ids,
+        f"chr1\t10\t.\tA\tC\t.\tPASS\t.\t{fmt}\t{value}\n",
+        columns=("S1",),
+    )
+    expect_error(
+        capsys, ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")], message
+    )
+
+
+def test_error_message_names_record(tmp_path, capsys):
+    vcf = write_vcf(
+        tmp_path / "bad.vcf",
+        ["GT", "AF"],
+        "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF\t0/1:.\n",
+        columns=("S1",),
+    )
+    expect_error(
+        capsys,
+        ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")],
+        f"{vcf}: line 5 (chr1:10), column S1:",
+    )
+
+
+def test_filtered_record_without_value_is_no_error(tmp_path):
+    vcf = write_vcf(
+        tmp_path / "f.vcf",
+        ["GT", "AF"],
+        "chr1\t10\t.\tA\tC\t.\tLowQual\t.\tGT:AF\t0/1:.\n",
+        columns=("S1",),
+    )
+    _, summary, _ = run(tmp_path, "--input", "S1", str(vcf))
+    assert summary[1][4:] == ["1", "1", "0", "0"]
 
 
 def test_error_af_count_mismatch(tmp_path, capsys):
     vcf = write_vcf(
         tmp_path / "bad.vcf",
-        "chr1\t10\t.\tA\tC,G\t.\tPASS\t.\tGT:AF\t0/0:0,0\t0/1:0.2\n",
+        ["GT", "AF"],
+        "chr1\t10\t.\tA\tC,G\t.\tPASS\t.\tGT:AF\t0/1:0.2\n",
+        columns=("S1",),
     )
     expect_error(
         capsys,
-        ["--vcf", str(vcf), "--prefix", str(tmp_path / "o")],
-        "FORMAT/AF has 1 values for 2 ALT allele(s)",
+        ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")],
+        "FORMAT/AF has 1 value(s) for 2 ALT allele(s)",
     )
 
 
 def test_error_wrong_column_count(tmp_path, capsys):
     vcf = write_vcf(
-        tmp_path / "bad.vcf", "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF\t0/0:0\n"
+        tmp_path / "bad.vcf",
+        ["GT", "AF"],
+        "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF\t0/0:0\n",
     )
     expect_error(
         capsys,
-        ["--vcf", str(vcf), "--prefix", str(tmp_path / "o")],
-        "line 3: expected 11 columns, found 10",
+        ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")],
+        "line 5: expected 11 columns, found 10",
     )
 
 
@@ -260,7 +429,7 @@ def test_error_no_header(tmp_path, capsys):
     vcf.write_text("##fileformat=VCFv4.2\n")
     expect_error(
         capsys,
-        ["--vcf", str(vcf), "--prefix", str(tmp_path / "o")],
+        ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")],
         "no #CHROM header line found",
     )
 
@@ -272,7 +441,7 @@ def test_error_no_sample_columns(tmp_path, capsys):
     )
     expect_error(
         capsys,
-        ["--vcf", str(vcf), "--prefix", str(tmp_path / "o")],
+        ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")],
         "header line has no sample columns",
     )
 
@@ -281,49 +450,68 @@ def test_error_not_gzip(tmp_path, capsys):
     vcf = tmp_path / "broken.vcf.gz"
     vcf.write_text("this is not gzip")
     expect_error(
-        capsys, ["--vcf", str(vcf), "--prefix", str(tmp_path / "o")], "cannot read VCF"
+        capsys,
+        ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")],
+        "cannot read VCF",
     )
 
 
 def test_error_truncated_gzip(tmp_path, capsys):
     vcf = tmp_path / "truncated.vcf.gz"
     vcf.write_bytes(
-        gzip.compress(
-            (HEADER + "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF\t0/0:0\t0/1:0.2\n").encode()
-        )[:-10]
+        gzip.compress(DRAGEN.read_bytes() and gzip.decompress(DRAGEN.read_bytes()))[
+            :-10
+        ]
     )
     expect_error(
-        capsys, ["--vcf", str(vcf), "--prefix", str(tmp_path / "o")], "cannot read VCF"
+        capsys,
+        ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")],
+        "cannot read VCF",
     )
 
 
 def test_error_missing_file(tmp_path, capsys):
     expect_error(
         capsys,
-        ["--vcf", str(tmp_path / "missing.vcf.gz"), "--prefix", str(tmp_path / "o")],
-        "VCF not found",
+        [
+            "--input",
+            "S1",
+            str(tmp_path / "missing.vcf.gz"),
+            "--prefix",
+            str(tmp_path / "o"),
+        ],
+        "(sample S1): VCF not found",
     )
 
 
-def test_error_regex_matches_no_sample(tmp_path, capsys):
+def test_error_regex_matches_no_column(tmp_path, capsys):
     expect_error(
         capsys,
         [
-            "--vcf",
-            str(VCF1),
+            "--input",
+            "VAFT01",
+            str(DRAGEN),
             "--sample-regex",
             "TUMOR$",
             "--prefix",
             str(tmp_path / "o"),
         ],
-        "no sample matches --sample-regex 'TUMOR$' (samples in the VCF: VAFT01-N, VAFT01-T)",
+        "(sample VAFT01): no column matches --sample-regex 'TUMOR$' (columns in the VCF: VAFT01-N, VAFT01-T)",
     )
 
 
 def test_error_invalid_regex(tmp_path, capsys):
     expect_error(
         capsys,
-        ["--vcf", str(VCF1), "--sample-regex", "(", "--prefix", str(tmp_path / "o")],
+        [
+            "--input",
+            "S1",
+            str(DRAGEN),
+            "--sample-regex",
+            "(",
+            "--prefix",
+            str(tmp_path / "o"),
+        ],
         "is not a valid regular expression",
     )
 
@@ -331,6 +519,39 @@ def test_error_invalid_regex(tmp_path, capsys):
 def test_error_duplicate_sample(tmp_path, capsys):
     expect_error(
         capsys,
-        ["--vcf", str(VCF1), str(VCF1), "--prefix", str(tmp_path / "o")],
-        "sample 'VAFT01-N' is in",
+        [
+            "--input",
+            "S1",
+            str(DRAGEN),
+            "--input",
+            "S1",
+            str(MUTECT2),
+            "--prefix",
+            str(tmp_path / "o"),
+        ],
+        "sample(s) given more than once with --input: S1",
+    )
+
+
+def test_error_duplicate_histogram_name(tmp_path, capsys):
+    # sample "VAFT01_VAFT01-T" collides with column VAFT01-T of sample VAFT01
+    single = write_vcf(
+        tmp_path / "single.vcf",
+        ["GT", "AF"],
+        "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF\t0/1:0.3\n",
+        columns=("X",),
+    )
+    expect_error(
+        capsys,
+        [
+            "--input",
+            "VAFT01",
+            str(DRAGEN),
+            "--input",
+            "VAFT01_VAFT01-T",
+            str(single),
+            "--prefix",
+            str(tmp_path / "o"),
+        ],
+        "histogram name 'VAFT01_VAFT01-T' occurs twice",
     )

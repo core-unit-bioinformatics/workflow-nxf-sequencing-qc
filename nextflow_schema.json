@@ -116,7 +116,7 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Add a histogram of the variant allele fractions per sample to the MultiQC report.",
-                    "help_text": "Reads the small-variant VCFs under `--dragen_dirs` (see `--vaf_histogram_vcf_glob`), which is then required."
+                    "help_text": "Reads the VCF of every sample with a `vcf` in the samplesheet (any variant caller). The pipeline stops if no sample has a `vcf`."
                 },
                 "vaf_histogram_bin_width": {
                     "type": "number",
@@ -126,17 +126,18 @@
                     "description": "Width of the VAF bins, a fraction in (0, 1], e.g. 0.05 for 5 % bins.",
                     "help_text": "Bins are [start, end); the last bin includes VAF 1.0 and is cut at 1 if 1 is not a multiple of the width."
                 },
-                "vaf_histogram_vcf_glob": {
+                "vaf_histogram_allele_fraction": {
                     "type": "string",
-                    "default": "**.hard-filtered.vcf.gz",
-                    "description": "Glob pattern, relative to `--dragen_dirs`, of the VCFs to count.",
-                    "help_text": "The pipeline stops if no file matches. Each VCF sample column gets its own histogram; a sample name must not occur in more than one VCF."
+                    "default": "auto",
+                    "enum": ["auto", "FORMAT_AF", "FORMAT_AD"],
+                    "description": "Source of the VAF: `FORMAT_AF` (FORMAT/AF), `FORMAT_AD` (FORMAT/AD[alt] / FORMAT/DP) or `auto` (FORMAT_AF if the VCF header declares FORMAT/AF, else FORMAT_AD).",
+                    "help_text": "As `--allele_fraction` of cio-abcd/variantinterpretation, plus `auto`, which chooses per VCF from its header. The pipeline stops if a VCF lacks the needed FORMAT fields or a counted variant has no value."
                 },
                 "vaf_histogram_sample_regex": {
                     "type": "string",
                     "pattern": "^[^']+$",
-                    "description": "Count only VCF samples whose name matches this regular expression (Python syntax), e.g. `-T$` for the tumor samples. Default: all samples.",
-                    "help_text": "The pipeline stops if the regex matches no sample of a VCF. Must not contain a single quote."
+                    "description": "Count only VCF columns whose sample name matches this regular expression (Python syntax), e.g. `-T$` for the tumor column of a tumor/normal VCF. Default: all columns.",
+                    "help_text": "The pipeline stops if the regex matches no column of a VCF. With one counted column the histogram is named after the samplesheet sample, with several `<sample>_<column>`. Must not contain a single quote."
                 },
                 "vaf_histogram_include_filtered": {
                     "type": "boolean",
