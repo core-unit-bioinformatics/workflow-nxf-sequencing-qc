@@ -85,15 +85,13 @@ workflow EXOMEQC {
     }
 
     if (params.enable_vaf_histogram) {
-        if (!params.dragen_dirs) {
-            error("Please provide --dragen_dirs when --enable_vaf_histogram is set")
-        }
-
-        // all small-variant VCFs under --dragen_dirs; stops if the glob matches nothing
-        def vaf_vcf_glob = "${params.dragen_dirs.toString().replaceAll('/+$', '')}/${params.vaf_histogram_vcf_glob}"
-        ch_vaf_vcfs = channel
-            .fromPath(vaf_vcf_glob, checkIfExists: true)
-            .collect()
+        // the VCFs of the samplesheet column 'vcf', sorted by sample: [ [ samples ], [ vcfs ] ]
+        ch_vaf_vcfs = ch_samplesheet
+            .filter { meta, _reads -> meta.vcf }
+            .map { meta, _reads -> [ meta.id, file(meta.vcf.toString(), checkIfExists: true) ] }
+            .ifEmpty { error("--enable_vaf_histogram is set, but no sample in the samplesheet has a 'vcf'; add the column 'vcf' or set --enable_vaf_histogram false") }
+            .toSortedList { a, b -> a[0] <=> b[0] }
+            .map { pairs -> [ pairs.collect { pair -> pair[0] }, pairs.collect { pair -> pair[1] } ] }
 
         VAF_HISTOGRAM(ch_vaf_vcfs)
 

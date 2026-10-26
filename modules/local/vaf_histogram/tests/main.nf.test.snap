@@ -1,32 +1,5 @@
 {
-    "default params - 0.05 bins, all samples, PASS only": {
-        "content": [
-            [
-                "vaf_histogram.tsv:md5,a24aa905688665026852aa389838c6e6"
-            ],
-            [
-                "vaf_histogram_summary.tsv:md5,1862d3880978dd8bc2b77807f7b885b4"
-            ],
-            [
-                "vaf_histogram_mqc.json:md5,7bf734f9ca6d158583c688a62744faff"
-            ],
-            {
-                "versions_python": [
-                    [
-                        "VAF_HISTOGRAM",
-                        "python",
-                        "3.12.15"
-                    ]
-                ]
-            }
-        ],
-        "timestamp": "2026-10-24T12:01:33.902686413",
-        "meta": {
-            "nf-test": "0.9.5",
-            "nextflow": "26.04.4"
-        }
-    },
-    "default params - stub": {
+    "auto VAF source - stub": {
         "content": [
             {
                 "0": [
@@ -63,7 +36,25 @@
                 ]
             }
         ],
-        "timestamp": "2026-10-24T12:09:48.890209185",
+        "timestamp": "2026-10-26T15:11:31.94438435",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "DRAGEN, Mutect2, FreeBayes - auto VAF source, tumor columns": {
+        "content": [
+            [
+                "vaf_histogram.tsv:md5,5180d79941b22ef18e656f4038d25f41"
+            ],
+            [
+                "vaf_histogram_summary.tsv:md5,261061feef8e94ac7330320019f8b70f"
+            ],
+            [
+                "vaf_histogram_mqc.json:md5,cb67731cf8db87b281c40285d0e26c5c"
+            ]
+        ],
+        "timestamp": "2026-10-26T15:09:25.313175751",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

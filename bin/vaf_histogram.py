@@ -1,33 +1,46 @@
 #!/usr/bin/env python3
 """Count variants per variant allele fraction (VAF) bin for a MultiQC histogram.
 
-Reads small-variant VCFs (e.g. DRAGEN `*.hard-filtered.vcf.gz`) and counts,
-per VCF sample column, the variants in VAF bins of a fixed width (default
-0.05). Writes
+Reads one small-variant VCF per samplesheet sample (`--input SAMPLE VCF`, any
+variant caller) and counts, per VCF sample column, the variants in VAF bins
+of a fixed width (default 0.05). Writes
 
-- `<prefix>.tsv`: one row per sample and bin (sample, vcf, bin_start,
-  bin_end, variants);
-- `<prefix>_summary.tsv`: per sample, how many records and alleles were
-  read, counted and skipped (with the reason);
+- `<prefix>.tsv`: one row per histogram and bin (sample, vcf_sample, vcf,
+  bin_start, bin_end, variants);
+- `<prefix>_summary.tsv`: per histogram, the VAF source and how many records
+  and alleles were read, counted and skipped (with the reason);
 - `<prefix>_mqc.json`: MultiQC custom content, a line graph with one dataset
-  per sample, drawn as a step outline (x: VAF, y: number of variants).
+  per histogram, drawn as a step outline (x: VAF, y: number of variants).
 
-VAF per ALT allele: FORMAT/AF of the sample. If AF is missing or `.`, the VAF
-is computed from FORMAT/AD as AD[alt] / sum(AD); this fallback is logged and
-counted. Alleles with neither are skipped and counted. By default only
-records with FILTER `PASS` are counted. Each ALT allele of a multi-allelic
-record counts as one variant. Bins are [start, end), the last bin includes
-VAF 1.0. Bin edges use decimal arithmetic, so a VAF of exactly 0.15 falls into
-[0.15, 0.20) and not into [0.10, 0.15) by floating-point error.
+VAF source (`--allele-fraction`), as in cio-abcd/variantinterpretation:
 
-Why custom code: bcftools/`bcftools +af-dist` bin allele frequencies
-predicted from genotypes, not observed per-sample VAFs, and MultiQC has no
-VAF histogram module. Only FILTER, FORMAT/AF and FORMAT/AD are needed, so the
-VCF is parsed with the standard library (no extra dependency).
+- `FORMAT_AF`: FORMAT/AF of the sample, one value per ALT allele;
+- `FORMAT_AD`: FORMAT/AD[alt] / FORMAT/DP of the sample;
+- `auto` (default): FORMAT_AF if the VCF header declares FORMAT/AF, else
+  FORMAT_AD if it declares FORMAT/AD and FORMAT/DP, else an error.
 
-Errors (exit 1, `ERROR:` on stderr): unreadable or malformed VCF, a VAF
-outside [0, 1], a bin width outside (0, 1], a sample regex that matches no
-sample of a VCF, the same sample name in more than one VCF.
+The source is chosen per VCF from its header and logged. A counted variant
+allele without a value in the chosen field(s) stops with an error; there is
+no fallback to another field. Each ALT allele of a multi-allelic record counts
+as one variant (as after splitting with `bcftools norm -m-any`); ALT `.`, `*`,
+`<NON_REF>` and `<*>` are no variant alleles and are skipped and counted. By
+default only records with FILTER `PASS` are counted. Bins are [start, end),
+the last bin includes VAF 1.0. Bin edges use decimal arithmetic, so a VAF of
+exactly 0.15 falls into [0.15, 0.20) and not into [0.10, 0.15) by
+floating-point error.
+
+The histogram of a VCF with one (selected) sample column is named after the
+samplesheet sample; with several columns, each is named `<sample>_<column>`.
+
+Why custom code: `bcftools +af-dist` bins allele frequencies predicted from
+genotypes, not observed per-sample VAFs, and MultiQC has no VAF histogram
+module. Only FILTER and FORMAT/AF, AD and DP are needed, so the VCF is parsed
+with the standard library (no extra dependency).
+
+Errors (exit 1, `ERROR:` on stderr): unreadable or malformed VCF, VCF header
+without the fields of the chosen VAF source, a counted variant allele without
+a value, a VAF outside [0, 1], a bin width outside (0, 1], a sample regex that
+matches no column of a VCF, duplicate samples or histogram names.
 """
 
 import argparse
@@ -40,6 +53,9 @@ from pathlib import Path
 
 # ALT values that are no variant allele (reference blocks, missing ALT)
 NON_VARIANT_ALTS = {".", "*", "<NON_REF>", "<*>"}
+
+# VAF sources that can be chosen with --allele-fraction
+AF_SOURCES = ("auto", "FORMAT_AF", "FORMAT_AD")
 
 
 def log(level, message):
@@ -90,82 +106,109 @@ def open_vcf(path):
     return open(path, "rt")
 
 
-def parse_vaf(text, path, line_no, field):
-    """Return a VAF string as Decimal, or stop if it is not a number in [0, 1]."""
-    try:
-        vaf = Decimal(text)
-    except InvalidOperation:
-        fail(f"{path}: line {line_no}: FORMAT/{field} value '{text}' is not a number")
-    if not vaf.is_finite() or vaf < 0 or vaf > 1:
+def choose_source(requested, format_ids, path):
+    """Return the VAF source for one VCF from the requested one and its ##FORMAT IDs."""
+    has_af = "AF" in format_ids
+    has_ad_dp = "AD" in format_ids and "DP" in format_ids
+    declared = ", ".join(sorted(format_ids)) or "none"
+    # auto: FORMAT/AF first, then FORMAT/AD with FORMAT/DP
+    if requested == "auto":
+        if has_af:
+            return "FORMAT_AF"
+        if has_ad_dp:
+            return "FORMAT_AD"
         fail(
-            f"{path}: line {line_no}: VAF {text} from FORMAT/{field} is outside [0, 1]"
+            f"{path}: cannot determine the VAF: the header declares neither FORMAT/AF nor "
+            f"FORMAT/AD + FORMAT/DP (declared FORMAT fields: {declared}); add the fields to the VCF "
+            "or set --enable_vaf_histogram false"
         )
-    return vaf
+    if requested == "FORMAT_AF" and not has_af:
+        fail(
+            f"{path}: --allele-fraction FORMAT_AF, but the header declares no FORMAT/AF "
+            f"(declared FORMAT fields: {declared}); use FORMAT_AD or auto"
+        )
+    if requested == "FORMAT_AD" and not has_ad_dp:
+        fail(
+            f"{path}: --allele-fraction FORMAT_AD, but the header does not declare FORMAT/AD and "
+            f"FORMAT/DP (declared FORMAT fields: {declared}); use FORMAT_AF or auto"
+        )
+    return requested
 
 
-def allele_vafs(fmt, sample_values, n_alts, path, line_no):
-    """Return (vafs, source) for the ALT alleles of one sample.
+def parse_decimal(text, where, field):
+    """Return a FORMAT value as Decimal, or stop if it is missing or not a number."""
+    if text in (".", ""):
+        fail(f"{where}: FORMAT/{field} is missing ('{text}') for a counted variant")
+    try:
+        value = Decimal(text)
+    except InvalidOperation:
+        fail(f"{where}: FORMAT/{field} value '{text}' is not a number")
+    if not value.is_finite():
+        fail(f"{where}: FORMAT/{field} value '{text}' is not a finite number")
+    return value
 
-    vafs is a list with one Decimal or None per ALT allele; source is 'AF',
-    'AD' (fallback) or None (no VAF available).
-    """
+
+def allele_vafs(source, fmt, sample_values, n_alts, where):
+    """Return one Decimal VAF per ALT allele of one sample, from FORMAT_AF or FORMAT_AD."""
     # map the FORMAT keys to this sample's values; trailing fields may be dropped
     values = dict(zip(fmt, sample_values.split(":")))
-    af = values.get("AF", ".")
-    # use FORMAT/AF when present: one value per ALT allele
-    if af not in (".", ""):
-        parts = af.split(",")
+    if source == "FORMAT_AF":
+        # FORMAT/AF: one fraction per ALT allele
+        parts = values.get("AF", ".").split(",")
         if len(parts) != n_alts:
             fail(
-                f"{path}: line {line_no}: FORMAT/AF has {len(parts)} values for {n_alts} ALT allele(s)"
+                f"{where}: FORMAT/AF has {len(parts)} value(s) for {n_alts} ALT allele(s)"
             )
-        return [
-            None if p == "." else parse_vaf(p, path, line_no, "AF") for p in parts
-        ], "AF"
-    # fall back to FORMAT/AD: REF count first, then one count per ALT allele
-    ad = values.get("AD", ".")
-    if ad not in (".", ""):
-        parts = ad.split(",")
+        vafs = [parse_decimal(p, where, "AF") for p in parts]
+        hint = "FORMAT/AF"
+    else:
+        # FORMAT/AD: REF count first, then one count per ALT allele; FORMAT/DP: depth
+        parts = values.get("AD", ".").split(",")
         if len(parts) != n_alts + 1:
             fail(
-                f"{path}: line {line_no}: FORMAT/AD has {len(parts)} values for 1 REF + {n_alts} ALT allele(s)"
+                f"{where}: FORMAT/AD has {len(parts)} value(s) for 1 REF + {n_alts} ALT allele(s)"
             )
-        if "." in parts:
-            return [None] * n_alts, None
-        try:
-            counts = [int(p) for p in parts]
-        except ValueError:
-            fail(f"{path}: line {line_no}: FORMAT/AD '{ad}' is not a list of integers")
-        depth = sum(counts)
-        # no reads: no VAF
-        if depth == 0:
-            return [None] * n_alts, None
-        return [Decimal(c) / Decimal(depth) for c in counts[1:]], "AD"
-    return [None] * n_alts, None
+        ad = [parse_decimal(p, where, "AD") for p in parts]
+        depth = parse_decimal(values.get("DP", "."), where, "DP")
+        # a counted variant needs reads; DP 0 gives no VAF
+        if depth <= 0:
+            fail(f"{where}: FORMAT/DP is {values.get('DP')}, no VAF can be computed")
+        vafs = [count / depth for count in ad[1:]]
+        hint = f"FORMAT/AD {values.get('AD')} / FORMAT/DP {values.get('DP')}"
+    # a fraction outside [0, 1] means inconsistent fields (e.g. AD[alt] > DP)
+    for vaf in vafs:
+        if vaf < 0 or vaf > 1:
+            fail(f"{where}: VAF {vaf.normalize()} from {hint} is outside [0, 1]")
+    return vafs
 
 
 def new_summary():
-    """Return an empty per-sample counter dict."""
+    """Return an empty per-histogram counter dict."""
     return {
         "records_read": 0,
         "records_filtered": 0,
         "alleles_counted": 0,
-        "alleles_vaf_from_ad": 0,
-        "alleles_no_vaf": 0,
         "alleles_non_variant": 0,
     }
 
 
-def count_vcf(path, sample_regex, include_filtered, width, n_bins):
-    """Return {sample: (counts per bin, summary)} for the selected samples of one VCF."""
-    samples = None
+def count_vcf(
+    sample, path, requested_source, sample_regex, include_filtered, width, n_bins
+):
+    """Return (source, {vcf column: (counts per bin, summary)}) for the selected columns of one VCF."""
+    format_ids = set()
+    columns = None
     selected = []
+    source = None
     result = {}
     try:
         with open_vcf(path) as handle:
             for line_no, line in enumerate(handle, start=1):
-                # skip meta-information lines
+                # collect the declared FORMAT fields from the meta-information lines
                 if line.startswith("##"):
+                    match = re.match(r"##FORMAT=<ID=([^,>]+)", line)
+                    if match:
+                        format_ids.add(match.group(1))
                     continue
                 fields = line.rstrip("\n").split("\t")
                 # the header line names the sample columns
@@ -174,58 +217,57 @@ def count_vcf(path, sample_regex, include_filtered, width, n_bins):
                         fail(
                             f"{path}: header line has no sample columns (FORMAT + samples expected)"
                         )
-                    samples = fields[9:]
-                    # keep the samples matching the regex, or all samples without regex
+                    columns = fields[9:]
+                    # keep the columns matching the regex, or all columns without regex
                     selected = [
-                        (i, s)
-                        for i, s in enumerate(samples)
-                        if sample_regex is None or sample_regex.search(s)
+                        (i, c)
+                        for i, c in enumerate(columns)
+                        if sample_regex is None or sample_regex.search(c)
                     ]
                     if not selected:
                         fail(
-                            f"{path}: no sample matches --sample-regex '{sample_regex.pattern}' "
-                            f"(samples in the VCF: {', '.join(samples)}); check --vaf_histogram_sample_regex"
+                            f"{path} (sample {sample}): no column matches --sample-regex "
+                            f"'{sample_regex.pattern}' (columns in the VCF: {', '.join(columns)}); "
+                            "check --vaf_histogram_sample_regex"
                         )
-                    result = {s: ([0] * n_bins, new_summary()) for _, s in selected}
+                    # the VAF source follows from the header (fails if it lacks the fields)
+                    source = choose_source(requested_source, format_ids, path)
+                    result = {c: ([0] * n_bins, new_summary()) for _, c in selected}
                     continue
-                if samples is None:
+                if columns is None:
                     fail(
                         f"{path}: line {line_no}: data line before the #CHROM header line"
                     )
-                if len(fields) != 9 + len(samples):
+                if len(fields) != 9 + len(columns):
                     fail(
-                        f"{path}: line {line_no}: expected {9 + len(samples)} columns, found {len(fields)}"
+                        f"{path}: line {line_no}: expected {9 + len(columns)} columns, found {len(fields)}"
                     )
                 alts = fields[4].split(",")
                 fmt = fields[8].split(":")
                 passed = fields[6] == "PASS"
-                for col, sample in selected:
-                    counts, summary = result[sample]
+                for col, column in selected:
+                    counts, summary = result[column]
                     summary["records_read"] += 1
                     # count only PASS records unless filtered records are included
                     if not passed and not include_filtered:
                         summary["records_filtered"] += 1
                         continue
-                    vafs, source = allele_vafs(
-                        fmt, fields[9 + col], len(alts), path, line_no
-                    )
-                    for alt, vaf in zip(alts, vafs):
-                        # skip reference blocks and missing ALT alleles
-                        if alt in NON_VARIANT_ALTS:
-                            summary["alleles_non_variant"] += 1
-                            continue
-                        if vaf is None:
-                            summary["alleles_no_vaf"] += 1
-                            continue
-                        if source == "AD":
-                            summary["alleles_vaf_from_ad"] += 1
-                        counts[bin_index(vaf, width, n_bins)] += 1
-                        summary["alleles_counted"] += 1
+                    # skip records without any variant allele before reading the VAF
+                    variant = [alt not in NON_VARIANT_ALTS for alt in alts]
+                    summary["alleles_non_variant"] += variant.count(False)
+                    if not any(variant):
+                        continue
+                    where = f"{path}: line {line_no} ({fields[0]}:{fields[1]}), column {column}"
+                    vafs = allele_vafs(source, fmt, fields[9 + col], len(alts), where)
+                    for is_variant, vaf in zip(variant, vafs):
+                        if is_variant:
+                            counts[bin_index(vaf, width, n_bins)] += 1
+                            summary["alleles_counted"] += 1
     except (OSError, EOFError, UnicodeDecodeError, gzip.BadGzipFile) as err:
         fail(f"{path}: cannot read VCF ({err})")
-    if samples is None:
+    if columns is None:
         fail(f"{path}: no #CHROM header line found; is this a VCF?")
-    return result
+    return source, result
 
 
 def fmt_edge(value):
@@ -249,19 +291,20 @@ def step_points(bins, counts):
     return points
 
 
-def multiqc_json(per_sample, bins, width, include_filtered):
-    """Return the MultiQC custom content dict for the VAF histogram."""
-    names = sorted(per_sample)
+def multiqc_json(histograms, bins, width, include_filtered):
+    """Return the MultiQC custom content dict for the VAF histograms."""
+    names = sorted(histograms)
     filter_text = (
         "all records (PASS and filtered)"
         if include_filtered
         else "records with FILTER PASS"
     )
+    sources = sorted({h["source"] for h in histograms.values()})
     description = (
         f"Number of variants per variant allele fraction (VAF) bin of width {fmt_edge(width)}, "
-        f"one plot per sample (buttons above the plot). Counted: {filter_text}; "
-        "VAF from FORMAT/AF, or from FORMAT/AD where AF is missing. Bins are [start, end), "
-        "the last bin includes VAF 1.0."
+        f"one plot per sample (buttons above the plot). Counted: {filter_text}. "
+        f"VAF from {' and '.join(sources)} (FORMAT_AF: FORMAT/AF; FORMAT_AD: FORMAT/AD[alt] / FORMAT/DP), "
+        "see vaf_histogram_summary.tsv per sample. Bins are [start, end), the last bin includes VAF 1.0."
     )
     return {
         "id": "exomeqc_vaf_histogram",
@@ -280,18 +323,27 @@ def multiqc_json(per_sample, bins, width, include_filtered):
                 {"name": name, "ylab": "Number of variants"} for name in names
             ],
         },
-        "data": [{name: step_points(bins, per_sample[name][0])} for name in names],
+        "data": [
+            {name: step_points(bins, histograms[name]["counts"])} for name in names
+        ],
     }
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "--vcf",
-        nargs="+",
+        "--input",
+        nargs=2,
+        action="append",
         required=True,
-        type=Path,
-        help="small-variant VCF(s), plain or gzipped",
+        metavar=("SAMPLE", "VCF"),
+        help="samplesheet sample and its VCF (plain or gzipped); repeat for each sample",
+    )
+    parser.add_argument(
+        "--allele-fraction",
+        default="auto",
+        choices=AF_SOURCES,
+        help="VAF source: FORMAT_AF, FORMAT_AD (AD[alt]/DP) or auto (AF if declared, else AD) (default: auto)",
     )
     parser.add_argument(
         "--bin-width", default="0.05", help="VAF bin width in (0, 1] (default: 0.05)"
@@ -299,7 +351,7 @@ def main(argv=None):
     parser.add_argument(
         "--sample-regex",
         default=None,
-        help="count only VCF samples matching this regex (default: all)",
+        help="count only VCF columns matching this regex (default: all columns)",
     )
     parser.add_argument(
         "--include-filtered",
@@ -322,73 +374,90 @@ def main(argv=None):
         fail(
             f"--sample-regex '{args.sample_regex}' is not a valid regular expression ({err})"
         )
+    # each samplesheet sample may occur only once
+    samples = [sample for sample, _ in args.input]
+    duplicates = sorted({s for s in samples if samples.count(s) > 1})
+    if duplicates:
+        fail(f"sample(s) given more than once with --input: {', '.join(duplicates)}")
     log(
         "INFO",
-        f"bin width {fmt_edge(width)}: {len(bins)} bins; counting {'all' if args.include_filtered else 'PASS'} records",
+        f"{len(args.input)} VCF(s); VAF source {args.allele_fraction}; bin width {fmt_edge(width)} "
+        f"({len(bins)} bins); counting {'all' if args.include_filtered else 'PASS'} records",
     )
 
-    per_sample = {}
-    source_vcf = {}
-    for path in args.vcf:
+    histograms = {}
+    for sample, vcf in args.input:
+        path = Path(vcf)
         if not path.is_file():
-            fail(f"{path}: VCF not found")
-        for sample, (counts, summary) in count_vcf(
-            path, sample_regex, args.include_filtered, width, len(bins)
-        ).items():
-            # the sample name is the series name, so it must be unique across VCFs
-            if sample in per_sample:
+            fail(f"{path} (sample {sample}): VCF not found")
+        source, per_column = count_vcf(
+            sample,
+            path,
+            args.allele_fraction,
+            sample_regex,
+            args.include_filtered,
+            width,
+            len(bins),
+        )
+        log("INFO", f"{path.name} (sample {sample}): VAF from {source}")
+        for column, (counts, summary) in per_column.items():
+            # one selected column: name the histogram after the sample, else sample_column
+            name = sample if len(per_column) == 1 else f"{sample}_{column}"
+            if name in histograms:
                 fail(
-                    f"sample '{sample}' is in {source_vcf[sample]} and {path}; series names must be unique "
-                    "(restrict the samples with --vaf_histogram_sample_regex or the VCFs with --vaf_histogram_vcf_glob)"
+                    f"histogram name '{name}' occurs twice ({histograms[name]['vcf']} and {path}); "
+                    "rename the sample or restrict the columns with --vaf_histogram_sample_regex"
                 )
-            per_sample[sample] = (counts, summary)
-            source_vcf[sample] = path
+            histograms[name] = {
+                "sample": sample,
+                "column": column,
+                "vcf": path,
+                "source": source,
+                "counts": counts,
+                "summary": summary,
+            }
             log(
                 "INFO",
-                f"{path.name}: {sample}: {summary['records_read']} records read, "
-                f"{summary['records_filtered']} skipped as not PASS, {summary['alleles_counted']} alleles counted "
-                f"({summary['alleles_vaf_from_ad']} with VAF from AD), {summary['alleles_no_vaf']} skipped without VAF, "
+                f"{path.name}: {name} (column {column}): {summary['records_read']} records read, "
+                f"{summary['records_filtered']} skipped as not PASS, {summary['alleles_counted']} alleles counted, "
                 f"{summary['alleles_non_variant']} skipped as non-variant ALT",
             )
-            if summary["alleles_vaf_from_ad"]:
-                log(
-                    "WARNING",
-                    f"{path.name}: {sample}: FORMAT/AF missing for {summary['alleles_vaf_from_ad']} allele(s), VAF computed from FORMAT/AD",
-                )
             if summary["alleles_counted"] == 0:
                 log(
                     "WARNING",
-                    f"{path.name}: {sample}: no variant counted, the histogram is empty",
+                    f"{path.name}: {name}: no variant counted, the histogram is empty",
                 )
 
-    # one row per sample and bin
+    # one row per histogram and bin
     with open(f"{args.prefix}.tsv", "w") as out:
-        out.write("sample\tvcf\tbin_start\tbin_end\tvariants\n")
-        for sample in sorted(per_sample):
+        out.write("sample\tvcf_sample\tvcf\tbin_start\tbin_end\tvariants\n")
+        for name in sorted(histograms):
+            h = histograms[name]
             out.writelines(
-                f"{sample}\t{source_vcf[sample].name}\t{fmt_edge(start)}\t{fmt_edge(end)}\t{count}\n"
-                for (start, end), count in zip(bins, per_sample[sample][0])
+                f"{name}\t{h['column']}\t{h['vcf'].name}\t{fmt_edge(start)}\t{fmt_edge(end)}\t{count}\n"
+                for (start, end), count in zip(bins, h["counts"])
             )
-    # per-sample counters of what was read, counted and skipped
+    # per-histogram VAF source and counters of what was read, counted and skipped
     with open(f"{args.prefix}_summary.tsv", "w") as out:
         keys = list(new_summary())
-        out.write("sample\tvcf\t" + "\t".join(keys) + "\n")
-        for sample in sorted(per_sample):
-            summary = per_sample[sample][1]
+        out.write("sample\tvcf_sample\tvcf\tvaf_source\t" + "\t".join(keys) + "\n")
+        for name in sorted(histograms):
+            h = histograms[name]
             out.write(
-                f"{sample}\t{source_vcf[sample].name}\t"
-                + "\t".join(str(summary[k]) for k in keys)
+                f"{name}\t{h['column']}\t{h['vcf'].name}\t{h['source']}\t"
+                + "\t".join(str(h["summary"][k]) for k in keys)
                 + "\n"
             )
     # MultiQC custom content
     with open(f"{args.prefix}_mqc.json", "w") as out:
         json.dump(
-            multiqc_json(per_sample, bins, width, args.include_filtered), out, indent=2
+            multiqc_json(histograms, bins, width, args.include_filtered), out, indent=2
         )
         out.write("\n")
     log(
         "INFO",
-        f"wrote {args.prefix}.tsv, {args.prefix}_summary.tsv, {args.prefix}_mqc.json for {len(per_sample)} sample(s)",
+        f"wrote {args.prefix}.tsv, {args.prefix}_summary.tsv, {args.prefix}_mqc.json "
+        f"for {len(histograms)} histogram(s)",
     )
 
 

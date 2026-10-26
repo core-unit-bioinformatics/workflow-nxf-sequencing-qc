@@ -1,3 +1,3 @@
-sample,fastq_1,fastq_2,bam
-SAMPLE_TUMOR,/path/to/fastq/files/sample_tumor_R1.fastq.gz,/path/to/fastq/files/sample_tumor_R2.fastq.gz,/path/to/bam/files/sample_tumor.bam
-SAMPLE_NORMAL,/path/to/fastq/files/sample_normal_R1.fastq.gz,/path/to/fastq/files/sample_normal_R2.fastq.gz,/path/to/bam/files/sample_normal.bam
+sample,fastq_1,fastq_2,bam,vcf
+SAMPLE_TUMOR,/path/to/fastq/files/sample_tumor_R1.fastq.gz,/path/to/fastq/files/sample_tumor_R2.fastq.gz,/path/to/bam/files/sample_tumor.bam,/path/to/vcf/files/sample_tumor.vcf.gz
+SAMPLE_NORMAL,/path/to/fastq/files/sample_normal_R1.fastq.gz,/path/to/fastq/files/sample_normal_R2.fastq.gz,/path/to/bam/files/sample_normal.bam,
