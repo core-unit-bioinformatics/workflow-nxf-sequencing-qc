@@ -1,0 +1,24 @@
+{
+    "--multiqc_report_name sets the report file name": {
+        "content": [
+            "20261023_LH00001_0001_ATEST.html",
+            "20261023_LH00001_0001_ATEST_data"
+        ],
+        "timestamp": "2026-11-17T12:58:18.301672414",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "without --multiqc_report_name the title-based default name is kept": {
+        "content": [
+            "Exome-Sequencing_multiqc_report.html",
+            "Exome-Sequencing_multiqc_report_data"
+        ],
+        "timestamp": "2026-11-17T13:00:48.537673377",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}
