@@ -36,7 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Params `enable_summary`, `summary_tmb_high`, `summary_msi_high`, `summary_hrd_high` (highlight cutoffs, unset by default).
 - Outputs `summary/exomeqc_summary.tsv` and `summary/biomarker.tsv`.
 - `-profile test` now runs on SEQC2 HCC1395/HCC1395BL tumor/normal data (gene panel, exome and genome,
-  ALK region, GRCh38) hosted on the `test-datasets` branch, with a FastQ Screen database and haplotype map.
+  ALK region, GRCh38) with a FastQ Screen database and haplotype map. The data are built locally with
+  `scripts/download_seqc2_testdata.py` (conda env `scripts/envs/seqc2_testdata.yaml`) before running the profile.
+- `--multiqc_inputs` is optional.
 - `--fastqscreen_database` accepts a `.tar.gz` of the database directory (unpacked with nf-core `untar`).
 
 ### `Fixed`

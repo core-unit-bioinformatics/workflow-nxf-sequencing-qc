@@ -317,12 +317,34 @@ To further assist in reproducibility, you can use share and reuse [parameter fil
 
 ## Test profile
 
-`-profile test` runs the pipeline on a small public dataset, downloaded on the fly, so no
-other parameters are needed:
+`-profile test` runs the pipeline on a small public dataset. **Nextflow does not download
+the test data.** Create it once with the download script, then run the profile from the same
+directory:
 
 ```bash
+# 1. tools for the download script (samtools, bcftools, bowtie2)
+conda env create -f scripts/envs/seqc2_testdata.yaml
+conda activate seqc2_testdata
+
+# 2. download and build the test data into ./testdata/seqc2/ (~4 MB, a few minutes)
+scripts/download_seqc2_testdata.py --outdir testdata
+
+# 3. run the test profile from the directory that contains testdata/
 nextflow run core-unit-bioinformatics/exomeqc -profile test,<docker/singularity/conda> --outdir results_test
 ```
+
+The `scripts/` folder is in the pipeline repository: clone it, or use the copy that
+`nextflow pull` places under `~/.nextflow/assets/core-unit-bioinformatics/exomeqc/`. If the
+data are somewhere else, pass `--pipelines_testdata_base_path /path/to/testdata/` (with a
+trailing slash). Without the data the run stops at parameter validation with
+`the file or directory 'testdata/seqc2/samplesheet.csv' does not exist`.
+
+Why not link the NCBI files directly: the SEQC2 source BAMs are 0.4 GB (panel), 12.5 GB
+(exome) and 137 GB (genome) per sample. Nextflow cannot fetch only a region of a remote file.
+FASTQs exist only as full SRA runs, and the FastQ Screen database and haplotype map are built
+from the slices. The script fetches just the region (`samtools view` on the indexed BAMs at
+`ftp://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/seqc/Somatic_Mutation_WG/data/`, SNPs from
+the 1000 Genomes panel at EBI, PhiX from NCBI) and builds the rest locally.
 
 The test data are SEQC2 reference samples HCC1395 (tumor) and HCC1395BL (matched normal),
 one pair each for **gene panel** (AmpliSeq), **exome** (WES) and **genome** (WGS), sliced to
@@ -351,11 +373,20 @@ check can and cannot tell on small regions:
 
 The test profile checks that the steps run. It is not a benchmark of identity calling.
 
-The data live on the `test-datasets` branch of the pipeline repository
-(`params.pipelines_testdata_base_path`). How they were made, with the script to rebuild them,
-is described in `seqc2/README.md` there. For offline/HPC use, download that folder, point
-`--pipelines_testdata_base_path` to its parent directory, and rewrite the URLs in
-`seqc2/samplesheet.csv` to local paths.
+Contents of `testdata/seqc2/` (all from the region above):
+
+| Path                    | Content                                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------- |
+| `bam/<sample>.bam(.bai)` | Complete, properly paired primary alignments, max. 4000 pairs per sample (panel ~2950, exome ~400, genome 4000) |
+| `fastq/<sample>_R{1,2}.fastq.gz` | The same read pairs as FASTQ                                                          |
+| `fastqscreen_db.tar.gz` | FastQ Screen database: Bowtie2 indices of the human region and PhiX174 (NC_001422.1)            |
+| `haplotype_map.txt`     | 24 biallelic SNPs with MAF >= 0.2 (1000 Genomes high-coverage panel), SEQC2 BAM dictionary      |
+| `samplesheet.csv`       | Samplesheet with absolute paths to the files above                                             |
+
+Sources: SEQC2 files `AmpliSeq_bams/AmpliSeq.bwa.HCC1395{,BL}_1.bam`,
+`WES/WES_IL_{T,N}_1.bwa.dedup.bam` and `WGS/WGS_IL_{T,N}_1.bwa.dedup.bam`. The region was
+chosen because the SEQC2 AmpliSeq panel covers it (it does not cover TP53). For the CI or
+offline use, run the script on a machine with network access and copy `testdata/` over.
 
 ## Core Nextflow arguments
 

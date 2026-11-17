@@ -74,6 +74,21 @@ nextflow run core-unit-bioinformatics/exomeqc \
 > [!WARNING]
 > Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/usage/getting_started/configuration#custom-configuration-files).
 
+## Test profile
+
+The `test` profile uses SEQC2 HCC1395/HCC1395BL tumor/normal data (gene panel, exome, genome).
+**The test data must be downloaded first**; Nextflow does not fetch it:
+
+```bash
+conda env create -f scripts/envs/seqc2_testdata.yaml && conda activate seqc2_testdata
+scripts/download_seqc2_testdata.py --outdir testdata      # ~4 MB into ./testdata/seqc2/
+nextflow run core-unit-bioinformatics/exomeqc -profile test,<docker/singularity/conda> --outdir results_test
+```
+
+Run `nextflow` from the directory that contains `testdata/`, or pass
+`--pipelines_testdata_base_path /path/to/testdata/`. Details and expected results:
+[docs/usage.md](docs/usage.md#test-profile).
+
 ## Credits
 
 core-unit-bioinformatics/exomeqc was originally written by Kai Horny.

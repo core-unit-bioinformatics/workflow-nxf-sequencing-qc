@@ -1,0 +1,10 @@
+name: seqc2_testdata
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.9
+  - samtools=1.21
+  - bcftools=1.21
+  - bowtie2=2.5.5
+  - curl
