@@ -42,7 +42,7 @@
 ## Usage
 
 > [!NOTE]
-> If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/usage/installation) on how to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/usage/introduction#how-to-run-a-pipeline) with `-profile test` before running the workflow on actual data.
+> If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/usage/installation) on how to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/usage/introduction#how-to-run-a-pipeline) with `-profile test_seqc2` (see [Test profile](#test-profile); `-profile test` is currently disabled) before running the workflow on actual data.
 
 <!-- TODO nf-core: Describe the minimum required steps to execute the pipeline, e.g. how to prepare samplesheets.
      Explain what rows and columns represent. For instance (please edit as appropriate):
@@ -73,6 +73,24 @@ nextflow run core-unit-bioinformatics/exomeqc \
 
 > [!WARNING]
 > Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/usage/getting_started/configuration#custom-configuration-files).
+
+## Test profile
+
+`-profile test` and `-profile test_full` are **disabled** for now (no test dataset with direct
+download links yet); the pipeline stops with an error when they are used. Use `test_seqc2`.
+
+The `test_seqc2` profile uses SEQC2 HCC1395/HCC1395BL tumor/normal data (gene panel, exome, genome).
+**The test data must be downloaded first**; Nextflow does not fetch it:
+
+```bash
+conda env create -f scripts/envs/seqc2_testdata.yaml && conda activate seqc2_testdata
+scripts/download_seqc2_testdata.py --outdir testdata      # ~4 MB into ./testdata/seqc2/
+nextflow run core-unit-bioinformatics/exomeqc -profile test_seqc2,<docker/singularity/conda> --outdir results_test
+```
+
+Run `nextflow` from the directory that contains `testdata/`, or pass
+`--pipelines_testdata_base_path /path/to/testdata/`. Details and expected results:
+[docs/usage.md](docs/usage.md#test-profile).
 
 ## Credits
 

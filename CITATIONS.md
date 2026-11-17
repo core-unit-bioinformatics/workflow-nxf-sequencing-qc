@@ -75,3 +75,13 @@
 - [Singularity](https://pubmed.ncbi.nlm.nih.gov/28494014/)
 
   > Kurtzer GM, Sochat V, Bauer MW. Singularity: Scientific containers for mobility of compute. PLoS One. 2017 May 11;12(5):e0177459. doi: 10.1371/journal.pone.0177459. eCollection 2017. PubMed PMID: 28494014; PubMed Central PMCID: PMC5426675.
+
+## Test data
+
+- [SEQC2 somatic reference samples (HCC1395 / HCC1395BL)](https://doi.org/10.1038/s41587-021-00993-6)
+
+  > Fang LT, Zhu B, Zhao Y, et al. Establishing community reference samples, data and call sets for benchmarking cancer mutation detection using whole-genome sequencing. Nat Biotechnol. 2021;39(9):1151-1160. doi: 10.1038/s41587-021-00993-6.
+
+- [1000 Genomes high-coverage panel](https://doi.org/10.1016/j.cell.2022.08.004) (haplotype map SNPs)
+
+  > Byrska-Bishop M, Evani US, Zhao X, et al. High-coverage whole-genome sequencing of the expanded 1000 Genomes Project cohort including 602 trios. Cell. 2022;185(18):3426-3440. doi: 10.1016/j.cell.2022.08.004.

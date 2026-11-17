@@ -35,6 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compact **Summary** section on top of the MultiQC report: per case CNV QC, purity, ploidy, TMB, MSI and HRD (DRAGEN), run-level CNV QC and fingerprint status; full biomarker values, CNV fail reasons, unexpected fingerprint pairs and incomplete cases in collapsed details (`EXOMEQC_SUMMARY`, `bin/exomeqc_summary.py`).
 - Params `enable_summary`, `summary_tmb_high`, `summary_msi_high`, `summary_hrd_high` (highlight cutoffs, unset by default).
 - Outputs `summary/exomeqc_summary.tsv` and `summary/biomarker.tsv`.
+- `-profile test_seqc2`: SEQC2 HCC1395/HCC1395BL tumor/normal data (gene panel, exome and genome,
+  ALK region, GRCh38) with a FastQ Screen database and haplotype map. The data are built locally with
+  `scripts/download_seqc2_testdata.py` (conda env `scripts/envs/seqc2_testdata.yaml`) before running the profile.
+- nf-test `tests/default.nf.test` (local only, `--config tests/seqc2/nf-test.config`) with a stable snapshot.
+- SEQC2 test data for the fingerprint check: `scripts/download_seqc2_testdata.py` also writes a reference slice
+  `reference.fasta` (+ `.fai`, `.dict`; the region ±1 kb, new option `--padding`, as one contig
+  `chr2_29699000_29741000`) and a `runid` column in `samplesheet.csv` (made up, one per assay: `SEQC2_PANEL`,
+  `SEQC2_EXOME`, `SEQC2_GENOME`). `-profile test_seqc2` and `tests/default.nf.test` pass it as `--fasta`,
+  `--fasta_fai` and `--fasta_dict`, so the profile runs with the fingerprint check (on by default).
 
 ### `Fixed`
 
@@ -58,6 +67,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fingerprint database: this run's fingerprints are crosschecked against the database and added to it after the fingerprint QC, with failed sites masked; the published fingerprints (`fingerprintcheck/fingerprints/`) are the fingerprints after QC.
 - MultiQC: `fingerprint_database.crosscheck_metrics.txt` is excluded from the Picard module (`sp.picard/crosscheckfingerprints.exclude_fn`), so database samples never enter the heatmap.
 - CNV QC Metrics table: columns ordered `QC_STATUS`, `QC_FAIL_REASONS`, `NORMAL_SEX`, `TUMOR_SEX`, `EstimatedTumorPurity`, `PMAD`, `Coverage MAD`, `DiploidCoverage`, `HomozygosityIndex`, `OutlierBafFraction`, `ModelSource`, then all others; tumor purity shown as whole percent with bars (0–100 %).
+- `-profile test` and `-profile test_full` are disabled (error message points to `test_seqc2`) until a test
+  dataset with direct download links exists; they are not used in GitHub CI (`nf-test.config`, `download_pipeline.yml`).
+- `--multiqc_inputs` is optional.
+- `--fastqscreen_database` accepts a `.tar.gz` of the database directory (unpacked with nf-core `untar`).
+- SEQC2 test data (`scripts/download_seqc2_testdata.py`): the BAMs and the haplotype map are moved onto the
+  reference slice contig (single `@SQ` line, positions shifted by -29698999, `SA`/`XA` tags removed, read pairs not
+  fully inside the padded region dropped) instead of carrying the full GRCh38_full_analysis_set_plus_decoy_hla
+  dictionary (~3,300 contigs), whose 3 GB FASTA Picard ExtractFingerprint would otherwise need. Rebuild the test
+  data after updating.
+- `tests/default.nf.test`: the snapshot now covers the fingerprint database outputs; the fingerprint QC tables, which
+  hold the QC date, are listed in `tests/.nftignore`. Fingerprint LOD scores are unchanged by the move onto the
+  reference slice.
 
 ### `Dependencies`
 

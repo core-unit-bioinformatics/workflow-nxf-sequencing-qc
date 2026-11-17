@@ -5,6 +5,7 @@
 */
 include { MULTIQC                 } from '../modules/nf-core/multiqc/main'
 include { FASTQSCREEN_FASTQSCREEN } from '../modules/nf-core/fastqscreen/fastqscreen/main'
+include { UNTAR                   } from '../modules/nf-core/untar/main'
 include { DRAGEN_CNV_QC           } from '../modules/local/dragen_cnv_qc/main'
 include { VAF_HISTOGRAM           } from '../modules/local/vaf_histogram/main'
 include { EXOMEQC_SUMMARY         } from '../modules/local/exomeqc_summary/main'
@@ -34,7 +35,8 @@ workflow EXOMEQC {
 
     // Collect output files for multiQC
     // using the nf-schema samplesheetToList function for adding directories to multiqc via config file
-    if(params.multiqc_inputs) {
+    // --multiqc_inputs is optional (e.g. not set in -profile test)
+    if (params.multiqc_inputs) {
         channel
             .fromList(samplesheetToList(params.multiqc_inputs, "${projectDir}/assets/multiqc_input_schema.json"))
             .set { ch_multiqc_inputs }
@@ -46,9 +48,22 @@ workflow EXOMEQC {
             error("Please provide --fastqscreen_database when --enable_fastqscreen is set")
         }
 
+        // The database is a directory or a .tar.gz of that directory (the only form
+        // that can be fetched from a URL, e.g. in -profile test). The unpacked
+        // directory keeps the archive name, so relative DATABASE paths in
+        // fastq_screen.conf ("<db_name>/<genome>/<index>") keep working.
+        def fastqscreen_db = file(params.fastqscreen_database, checkIfExists: true)
+        def ch_fastqscreen_db
+        if (fastqscreen_db.name.endsWith('.tar.gz')) {
+            UNTAR([ [ id: fastqscreen_db.name.replaceFirst(/\.tar\.gz$/, '') ], fastqscreen_db ])
+            ch_fastqscreen_db = UNTAR.out.untar.map { _meta, db -> db }.first()
+        } else {
+            ch_fastqscreen_db = channel.value(fastqscreen_db)
+        }
+
         FASTQSCREEN_FASTQSCREEN(
             ch_samplesheet,
-            file(params.fastqscreen_database, checkIfExists: true)
+            ch_fastqscreen_db
         )
 
         // MultiQC parses FastQ Screen from *_screen.txt output files.

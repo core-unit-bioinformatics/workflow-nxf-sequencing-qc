@@ -83,7 +83,7 @@ To enable FastQ Screen and include its metrics in MultiQC, add:
 --enable_fastqscreen --fastqscreen_database /path/to/FastQ_Screen_Genomes
 ```
 
-The `--fastqscreen_database` directory must contain `fastq_screen.conf` and the referenced genome index folders.
+The `--fastqscreen_database` directory must contain `fastq_screen.conf` and the referenced genome index folders. It can also be given as a `.tar.gz` of that directory (local path or URL); the pipeline unpacks it into a directory named like the archive without `.tar.gz`. `DATABASE` paths in `fastq_screen.conf` must be absolute or relative to the parent of the database directory (`<database_dir_name>/<genome>/<index_prefix>`).
 
 ### Fingerprint check and fingerprint database
 
@@ -315,6 +315,121 @@ To further assist in reproducibility, you can use share and reuse [parameter fil
 > [!TIP]
 > If you wish to share such profile (such as upload as supplementary material for academic publications), make sure to NOT include cluster specific paths to files, nor institutional specific profiles.
 
+## Test profile
+
+`-profile test` and `-profile test_full` are **disabled** for now: there is no test dataset
+with direct download links yet, and the pipeline stops with an error when they are used.
+They are not run in GitHub CI either.
+
+`-profile test_seqc2` runs the pipeline on a small public dataset. **Nextflow does not download
+the test data.** Create it once with the download script, then run the profile from the same
+directory:
+
+```bash
+# 1. tools for the download script (samtools, bcftools, bowtie2)
+conda env create -f scripts/envs/seqc2_testdata.yaml
+conda activate seqc2_testdata
+
+# 2. download and build the test data into ./testdata/seqc2/ (~4 MB, a few minutes)
+scripts/download_seqc2_testdata.py --outdir testdata
+
+# 3. run the test profile from the directory that contains testdata/
+nextflow run core-unit-bioinformatics/exomeqc -profile test_seqc2,<docker/singularity/conda> --outdir results_test
+```
+
+The `scripts/` folder is in the pipeline repository: clone it, or use the copy that
+`nextflow pull` places under `~/.nextflow/assets/core-unit-bioinformatics/exomeqc/`. If the
+data are somewhere else, pass `--pipelines_testdata_base_path /path/to/testdata/` (with a
+trailing slash). Without the data the run stops at parameter validation with
+`the file or directory 'testdata/seqc2/samplesheet.csv' does not exist`.
+
+Why not link the NCBI files directly: the SEQC2 source BAMs are 0.4 GB (panel), 12.5 GB
+(exome) and 137 GB (genome) per sample. Nextflow cannot fetch only a region of a remote file.
+FASTQs exist only as full SRA runs, and the FastQ Screen database and haplotype map are built
+from the slices. The script fetches just the region (`samtools view` on the indexed BAMs at
+`ftp://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/seqc/Somatic_Mutation_WG/data/`, SNPs from
+the 1000 Genomes panel at EBI, PhiX from NCBI) and builds the rest locally.
+
+The test data are SEQC2 reference samples HCC1395 (tumor) and HCC1395BL (matched normal),
+one pair each for **gene panel** (AmpliSeq), **exome** (WES) and **genome** (WGS), sliced to
+`chr2:29700000-29740000` (GRCh38, ALK). With them come a FastQ Screen database (human region
+and PhiX, `.tar.gz`) and a Picard haplotype map of common 1000 Genomes SNPs in that region.
+
+The fingerprint check needs `--fasta`, the reference the BAMs are aligned to. The SEQC2 BAMs
+are aligned to `GRCh38_full_analysis_set_plus_decoy_hla` (about 3,300 contigs, 3 GB), which is
+too large for a test. The script therefore moves the reads onto a **reference slice**: the
+region padded by 1 kb on each side (`--padding`), written as one contig named after its GRCh38
+coordinates, `chr2_29699000_29741000` (1-based, inclusive; position 1 of the contig is
+chr2:29699000). The BAM header has this contig as its only `@SQ` line, read and mate positions
+are shifted by -29698999, and read pairs not fully inside the padded region are dropped. The
+haplotype map uses the same contig and shifted positions. To map a position back to GRCh38, add
+29698999.
+
+The samplesheet has the `runid` column the fingerprint check requires. The run IDs are made up:
+one per assay (`SEQC2_PANEL`, `SEQC2_EXOME`, `SEQC2_GENOME`), shared by tumor and normal, as
+each assay is a separate sequencing run. Fingerprint IDs are thus e.g.
+`SEQC2_EXOME_HCC1395@SEQC2_EXOME`.
+
+| Step              | In the test profile | Expected result                                                              |
+| ----------------- | ------------------- | ---------------------------------------------------------------------------- |
+| FastQ Screen      | on                  | 97-100 % of reads hit `Human`, none hit `PhiX`                                |
+| Fingerprint check | on                  | see below                                                                    |
+| DRAGEN CNV QC     | off                 | not run; SEQC2 has no DRAGEN CNV output                                       |
+| MultiQC           | always              | report with FastQ Screen, fingerprint overview/QC and Picard fingerprint sections |
+
+Fingerprint results on the test data (reference run with conda, 2026-11-18; the LOD scores are
+the same as before the move onto the reference slice) show what the check can and cannot tell
+on small regions:
+
+- **Panel samples: `INCONCLUSIVE`** (LOD 0), even against themselves. None of the 24
+  haplotype-map SNPs fall inside the AmpliSeq amplicons. This is the panel restriction
+  described under [Fingerprint check](#fingerprint-check).
+- **Fingerprint QC and database:** only the genome samples pass (21 of 24 sites with depth
+  >= 10, self LOD 9.1 and 7.6, `SUITABLE`). The exome samples (6 blocks with reads, 2 passing
+  sites, self LOD 2.0 and 1.4) are `INSUFFICIENT`, the panel samples `NO_COVERAGE`; all four
+  get QC `FAIL` (logged as `WARNING`) and are still added to the database. No database is
+  given, so the updated database `exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` holds
+  the six fingerprints of this run.
+- **Same tissue across assays matches:** tumor exome vs tumor genome LOD +2.1, normal exome
+  vs normal genome LOD +0.4.
+- **Tumor vs normal is negative** (genome: LOD -41, tumor-aware -5), although both come from
+  the same donor. HCC1395 carries allelic changes in this region that the tumor-aware model
+  does not fully absorb. Picard labels these pairs `EXPECTED_MISMATCH` only because their
+  read-group sample names differ.
+
+The test profile checks that the steps run. It is not a benchmark of identity calling.
+
+nf-test: the pipeline test `tests/default.nf.test` uses `-profile test_seqc2` and needs the data
+in `testdata/` of the repository. It is excluded from GitHub CI (`nf-test.config` ignores it)
+and runs locally with its own nf-test config:
+
+```bash
+scripts/download_seqc2_testdata.py --outdir testdata
+nf-test test tests/default.nf.test --config tests/seqc2/nf-test.config --profile +docker
+```
+
+The snapshot compares output file names, the FastQ Screen tables, the software versions, the
+fingerprint results (pair, `RESULT`, LOD scores) and the fingerprint database tables. Files with
+run-specific content (MultiQC, FastQ Screen HTML, raw Picard metrics, fingerprint VCFs, QC tables
+with the QC date) are listed in `tests/.nftignore`; the test also checks that the updated
+fingerprint database is written with a timestamped name.
+
+Contents of `testdata/seqc2/` (all from the region above):
+
+| Path                    | Content                                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------- |
+| `bam/<sample>.bam(.bai)` | Complete primary read pairs fully inside the reference slice, on its contig, max. 4000 pairs per sample (panel ~2950, exome ~400, genome 4000) |
+| `fastq/<sample>_R{1,2}.fastq.gz` | The same read pairs as FASTQ                                                          |
+| `fastqscreen_db.tar.gz` | FastQ Screen database: Bowtie2 indices of the human region and PhiX174 (NC_001422.1)            |
+| `haplotype_map.txt`     | 24 biallelic SNPs with MAF >= 0.2 (1000 Genomes high-coverage panel) on the reference slice    |
+| `reference.fasta(.fai)`, `reference.dict` | Reference slice `chr2_29699000_29741000` (42,001 bp), passed as `--fasta`, `--fasta_fai`, `--fasta_dict` |
+| `samplesheet.csv`       | Samplesheet with run IDs and absolute paths to the files above                                 |
+
+Sources: SEQC2 files `AmpliSeq_bams/AmpliSeq.bwa.HCC1395{,BL}_1.bam`,
+`WES/WES_IL_{T,N}_1.bwa.dedup.bam` and `WGS/WGS_IL_{T,N}_1.bwa.dedup.bam`. The region was
+chosen because the SEQC2 AmpliSeq panel covers it (it does not cover TP53). For the CI or
+offline use, run the script on a machine with network access and copy `testdata/` over.
+
 ## Core Nextflow arguments
 
 > [!NOTE]
@@ -331,14 +446,15 @@ Several generic profiles are bundled with the pipeline which instruct the pipeli
 
 The pipeline also dynamically loads configurations from [https://github.com/nf-core/configs](https://github.com/nf-core/configs) when it runs, making multiple config profiles for various institutional clusters available at run time. For more information and to check if your system is supported, please see the [nf-core/configs documentation](https://github.com/nf-core/configs#documentation).
 
-Note that multiple profiles can be loaded, for example: `-profile test,docker` - the order of arguments is important!
+Note that multiple profiles can be loaded, for example: `-profile test_seqc2,docker` - the order of arguments is important!
 They are loaded in sequence, so later profiles can overwrite earlier profiles.
 
 If `-profile` is not specified, the pipeline will run locally and expect all software to be installed and available on the `PATH`. This is _not_ recommended, since it can lead to different results on different machines dependent on the computer environment.
 
-- `test`
-  - A profile with a complete configuration for automated testing
-  - Includes links to test data so needs no other parameters
+- `test`, `test_full`
+  - Disabled for now (no test data with direct links); see [Test profile](#test-profile)
+- `test_seqc2`
+  - SEQC2 tumor/normal test (panel, exome, genome); needs the data from `scripts/download_seqc2_testdata.py`, see [Test profile](#test-profile)
 - `docker`
   - A generic configuration profile to be used with [Docker](https://docker.com/)
 - `singularity`
