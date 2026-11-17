@@ -114,9 +114,9 @@
             "properties": {
                 "enable_vaf_histogram": {
                     "type": "boolean",
-                    "default": true,
+                    "default": false,
                     "description": "Add a histogram of the variant allele fractions per sample to the MultiQC report.",
-                    "help_text": "Reads the VCF of every sample with a `vcf` in the samplesheet (any variant caller). The pipeline stops if no sample has a `vcf`."
+                    "help_text": "Off by default. If set, reads the VCF of every sample with a `vcf` in the samplesheet (any variant caller). The pipeline stops if no sample has a `vcf`."
                 },
                 "vaf_histogram_bin_width": {
                     "type": "number",
