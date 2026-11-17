@@ -1,0 +1,21 @@
+{
+    "VCFs from the samplesheet - section in the MultiQC report": {
+        "content": [
+            {
+                "VAF_HISTOGRAM": {
+                    "python": "3.12.16"
+                },
+                "Workflow": {
+                    "core-unit-bioinformatics/exomeqc": "v1.0.0"
+                }
+            },
+            "vaf_histogram.tsv:md5,644c34001a731f50de45455b23bc3964",
+            "vaf_histogram_summary.tsv:md5,2f9f5cf6e3cf390795201e00da3ac98a"
+        ],
+        "timestamp": "2026-11-17T13:20:47.958373093",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}
