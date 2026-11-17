@@ -15,7 +15,7 @@
                     [
                         "VAF_HISTOGRAM",
                         "python",
-                        "3.12.15"
+                        "3.12.16"
                     ]
                 ],
                 "multiqc": [
@@ -31,12 +31,12 @@
                     [
                         "VAF_HISTOGRAM",
                         "python",
-                        "3.12.15"
+                        "3.12.16"
                     ]
                 ]
             }
         ],
-        "timestamp": "2026-10-26T15:11:31.94438435",
+        "timestamp": "2026-11-17T13:15:58.82767614",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"
@@ -48,13 +48,13 @@
                 "vaf_histogram.tsv:md5,5180d79941b22ef18e656f4038d25f41"
             ],
             [
-                "vaf_histogram_summary.tsv:md5,261061feef8e94ac7330320019f8b70f"
+                "vaf_histogram_summary.tsv:md5,1e8ff56e4aef562060e90713359f3398"
             ],
             [
-                "vaf_histogram_mqc.json:md5,cb67731cf8db87b281c40285d0e26c5c"
+                "vaf_histogram_mqc.json:md5,7cb9531f2f9323473003762a84d1ab06"
             ]
         ],
-        "timestamp": "2026-10-26T15:09:25.313175751",
+        "timestamp": "2026-11-17T13:11:56.729953068",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"
