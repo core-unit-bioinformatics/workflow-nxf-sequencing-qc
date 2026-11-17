@@ -22,8 +22,8 @@
                     "schema": "assets/schema_input.json",
                     "mimetype": "text/csv",
                     "pattern": "^\\S+\\.csv$",
-                    "description": "Path to comma-separated file containing information about the samples in the experiment.",
-                    "help_text": "You will need to create a design file with information about the samples in your experiment before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row.",
+                    "description": "Path to comma-separated samplesheet with one row per sample (and sequencing run). Columns: sample, fastq_1, fastq_2, bam, runid, vcf.",
+                    "help_text": "Works for any short-read assay (gene panel, exome, genome). `sample` is required; `fastq_1`/`fastq_2` are required for every row when `--enable_fastqscreen` is set (leave `fastq_2` empty for single-end data); `bam` (BAM, not CRAM; or FASTQ with `--align_reads_for_fingerprint`) and `runid` are required for every row when `--enable_fingerprintcheck` is set; `vcf` is optional (VAF histogram). See docs/usage.md.",
                     "fa_icon": "fas fa-file-csv"
                 },
                 "outdir": {
@@ -34,7 +34,7 @@
                 },
                 "multiqc_inputs": {
                     "type": "string",
-                    "description": "Path to file specifying the multiqc input directories. File should have header \"paths\"."
+                    "description": "Path to a CSV with header `paths` listing additional directories (e.g. DRAGEN, Picard, mosdepth output) for MultiQC to scan."
                 },
                 "email": {
                     "type": "string",
@@ -66,7 +66,7 @@
                 "enable_fingerprintcheck": {
                     "type": "boolean",
                     "description": "Enable the fingerprint check (Picard CrosscheckFingerprints and the fingerprint database).",
-                    "help_text": "When enabled, every samplesheet row needs a `runid` and either a `bam` or, with `--align_reads_for_fingerprint`, FASTQ files. Requires `--fingerprint_haplotype_map` and `--fasta`.",
+                    "help_text": "When enabled, every samplesheet row needs a `runid` and either a `bam` or, with `--align_reads_for_fingerprint`, FASTQ files. Requires `--fingerprint_haplotype_map` and `--fasta`. CRAM input is not supported for fingerprinting; use BAM.",
                     "default": true
                 },
                 "fingerprint_haplotype_map": {
@@ -166,7 +166,7 @@
                 "enable_fastqscreen": {
                     "type": "boolean",
                     "description": "Enable FastQ Screen analysis for input FASTQ files.",
-                    "help_text": "Requires `--fastqscreen_database` to point to a FastQ Screen database directory containing `fastq_screen.conf`.",
+                    "help_text": "Requires `--fastqscreen_database` and `fastq_1` (and `fastq_2` for paired-end data) for every samplesheet row. Single-end and paired-end samples are detected per sample from the samplesheet.",
                     "default": true
                 },
                 "fastqscreen_database": {
@@ -179,7 +179,8 @@
                 "fastqscreen_subset": {
                     "type": "integer",
                     "default": 1000000,
-                    "description": "Number of reads to subset for fastqscreen analysis. Paired-end should be twice as much."
+                    "description": "Number of reads (read pairs for paired-end data) sampled per sample by FastQ Screen.",
+                    "help_text": "Passed as `--subset`. Set to 0 to screen all reads."
                 }
             }
         },
@@ -474,6 +475,92 @@
                     "description": "Display hidden parameters in the help message (only works when --help or --help_full are provided)."
                 }
             }
+        },
+        "dragen_cnvqc_options": {
+            "title": "DRAGEN CNV QC options",
+            "type": "object",
+            "fa_icon": "fas fa-chart-area",
+            "description": "QC of DRAGEN CNV caller output. This step is specific to DRAGEN; all other steps are caller- and assay-agnostic.",
+            "properties": {
+                "enable_cnvqc": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Summarise DRAGEN somatic CNV caller output (QC table, purity model plot, karyotype plots).",
+                    "help_text": "DRAGEN-specific: only works with DRAGEN CNV output (`*.cnv_metrics.csv`, `*.cnv.vcf.gz`). Requires `--dragen_dirs`. Set to false for other CNV callers."
+                },
+                "dragen_dirs": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Directory with DRAGEN output. Used by CNV QC and added to the MultiQC inputs.",
+                    "help_text": "Required when `--enable_cnvqc` is set. If given, DRAGEN mapping/coverage/variant-calling metrics in this directory are also shown in MultiQC, for panel, exome or genome runs."
+                },
+                "pmad_max": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if PMAD (cnv_metrics.csv) is above this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "coverage_mad_max": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if Coverage MAD (cnv_metrics.csv) is above this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "outlier_baf_fraction_max": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if OutlierBafFraction (cnv_metrics.csv) is above this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "diploid_coverage_min": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if DiploidCoverage (CNV VCF header) is below this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "purity_min": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if EstimatedTumorPurity (CNV VCF header) is below this value. A fraction in [0, 1], e.g. 0.4 for 40 %. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "purity_max": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if EstimatedTumorPurity (CNV VCF header) is above this value. A fraction in [0, 1]. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "ploidy_min": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if OverallPloidy (CNV VCF header) is below this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "ploidy_max": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if OverallPloidy (CNV VCF header) is above this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "post_norm_sigma_max": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if Post-Normalization Bin Count Sigma (cnv_metrics.csv) is above this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "num_segments_max": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if the Number of segments (cnv_metrics.csv) is above this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "filtered_records_relative_max": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if the percentage of filtered records (cnv_metrics.csv) is above this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "homozygosity_index_max": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if HomozygosityIndex (CNV VCF header) is above this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                },
+                "total_excluded_bp_max": {
+                    "type": "string",
+                    "description": "CNV QC: fail a sample if the total length of the excluded intervals (*.cnv.excluded_intervals.bed.gz, in bp) is above this value. Not checked if unset.",
+                    "help_text": "DRAGEN CNV QC threshold. Calibrate per assay (panel, exome, genome); there are no built-in defaults."
+                }
+            }
         }
     },
     "allOf": [
@@ -493,6 +580,9 @@
             "$ref": "#/$defs/summary_options"
         },
         {
+            "$ref": "#/$defs/dragen_cnvqc_options"
+        },
+        {
             "$ref": "#/$defs/reference_genome_options"
         },
         {
@@ -501,68 +591,5 @@
         {
             "$ref": "#/$defs/generic_options"
         }
-    ],
-    "properties": {
-        "enable_cnvqc": {
-            "description": "Run the DRAGEN CNV QC (bin/analyze_cnv_metrics.R) on the DRAGEN output in --dragen_dirs.",
-            "type": "boolean",
-            "default": true
-        },
-        "dragen_dirs": {
-            "description": "Directory with the DRAGEN output of all samples, searched recursively for the CNV files.",
-            "type": "string"
-        },
-        "pmad_max": {
-            "description": "CNV QC: fail a sample if PMAD (cnv_metrics.csv) is above this value. Not checked if unset.",
-            "type": "string"
-        },
-        "coverage_mad_max": {
-            "description": "CNV QC: fail a sample if Coverage MAD (cnv_metrics.csv) is above this value. Not checked if unset.",
-            "type": "string"
-        },
-        "outlier_baf_fraction_max": {
-            "description": "CNV QC: fail a sample if OutlierBafFraction (cnv_metrics.csv) is above this value. Not checked if unset.",
-            "type": "string"
-        },
-        "diploid_coverage_min": {
-            "description": "CNV QC: fail a sample if DiploidCoverage (CNV VCF header) is below this value. Not checked if unset.",
-            "type": "string"
-        },
-        "purity_min": {
-            "description": "CNV QC: fail a sample if EstimatedTumorPurity (CNV VCF header) is below this value. A fraction in [0, 1], e.g. 0.4 for 40 %. Not checked if unset.",
-            "type": "string"
-        },
-        "purity_max": {
-            "description": "CNV QC: fail a sample if EstimatedTumorPurity (CNV VCF header) is above this value. A fraction in [0, 1]. Not checked if unset.",
-            "type": "string"
-        },
-        "ploidy_min": {
-            "description": "CNV QC: fail a sample if OverallPloidy (CNV VCF header) is below this value. Not checked if unset.",
-            "type": "string"
-        },
-        "ploidy_max": {
-            "description": "CNV QC: fail a sample if OverallPloidy (CNV VCF header) is above this value. Not checked if unset.",
-            "type": "string"
-        },
-        "post_norm_sigma_max": {
-            "description": "CNV QC: fail a sample if Post-Normalization Bin Count Sigma (cnv_metrics.csv) is above this value. Not checked if unset.",
-            "type": "string"
-        },
-        "num_segments_max": {
-            "description": "CNV QC: fail a sample if the Number of segments (cnv_metrics.csv) is above this value. Not checked if unset.",
-            "type": "string"
-        },
-        "filtered_records_relative_max": {
-            "description": "CNV QC: fail a sample if the percentage of filtered records (cnv_metrics.csv) is above this value. Not checked if unset.",
-            "type": "string"
-        },
-        "homozygosity_index_max": {
-            "description": "CNV QC: fail a sample if HomozygosityIndex (CNV VCF header) is above this value. Not checked if unset.",
-            "type": "string"
-        },
-        "total_excluded_bp_max": {
-            "description": "CNV QC: fail a sample if the total length of the excluded intervals (*.cnv.excluded_intervals.bed.gz, in bp) is above this value. Not checked if unset.",
-            "type": "string"
-        }
-    }
+    ]
 }

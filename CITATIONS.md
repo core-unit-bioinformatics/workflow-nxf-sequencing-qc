@@ -30,6 +30,14 @@
 
   > Wingett SW, Andrews S. FastQ Screen: A tool for multi-genome mapping and quality control. F1000Research 2018, 7:1338. doi: 10.12688/f1000research.15931.2.
 
+- [Illumina DRAGEN](https://www.illumina.com/products/by-type/informatics-products/dragen-secondary-analysis.html) (input data of the DRAGEN CNV QC and the report summary; not run by the pipeline)
+
+  > Behera S, Catreux S, Rossi M, et al. Comprehensive genome analysis and variant detection at scale using DRAGEN. Nat Biotechnol. 2025;43:1177-1191. doi: 10.1038/s41587-024-02382-1.
+
+- [karyoploteR](https://pubmed.ncbi.nlm.nih.gov/28575171/) (karyotype plots of the DRAGEN CNV QC)
+
+  > Gel B, Serra E. karyoploteR: an R/Bioconductor package to plot customizable genomes displaying arbitrary data. Bioinformatics. 2017 Oct 1;33(19):3088-3090. doi: 10.1093/bioinformatics/btx346. PubMed PMID: 28575171.
+
 - [Picard](https://broadinstitute.github.io/picard/)
 
   > Picard Toolkit. 2019. Broad Institute, GitHub Repository. https://broadinstitute.github.io/picard/; Broad Institute. CrosscheckFingerprints, ExtractFingerprint, CreateSequenceDictionary.

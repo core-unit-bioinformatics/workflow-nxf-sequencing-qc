@@ -80,7 +80,11 @@ workflow FINGERPRINTCHECK {
             }
             // samples without BAM can only be fingerprinted after alignment
             if (!meta.bam && !align_reads) {
-                error("FINGERPRINTCHECK: samplesheet row '${meta.id}' (run ${meta.runid}): column 'bam' is empty; provide a BAM/CRAM or set --align_reads_for_fingerprint to align its FASTQ files with bwa-mem2")
+                error("FINGERPRINTCHECK: samplesheet row '${meta.id}' (run ${meta.runid}): column 'bam' is empty; provide a BAM or set --align_reads_for_fingerprint to align its FASTQ files with bwa-mem2")
+            }
+            // Picard CrosscheckFingerprints and samtools mpileup get no reference index here
+            if (meta.bam && meta.bam.toString().endsWith('.cram')) {
+                error("FINGERPRINTCHECK: samplesheet row '${meta.id}' (run ${meta.runid}): CRAM input '${meta.bam}' is not supported for fingerprinting (expected BAM); convert it to BAM or set --enable_fingerprintcheck false")
             }
             // alignment takes exactly one single-end or one paired-end FASTQ set
             def expected_fastqs = meta.single_end ? 1 : 2

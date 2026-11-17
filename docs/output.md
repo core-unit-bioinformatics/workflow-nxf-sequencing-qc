@@ -2,19 +2,19 @@
 
 ## Introduction
 
-This document describes the output produced by the pipeline. Most of the plots are taken from the MultiQC report, which summarises results at the end of the pipeline.
-
-The directories listed below will be created in the results directory after the pipeline has finished. All paths are relative to the top-level results directory.
-
-<!-- TODO nf-core: Write this documentation describing your workflow's output -->
+This page describes the output of the pipeline. All paths are relative to `--outdir`.
+The output layout is the same for gene panels, exomes and genomes. Most of the plots are taken
+from the MultiQC report, which summarises results at the end of the pipeline.
 
 ## Pipeline overview
 
 The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes data using the following steps:
 
-- [Fingerprint check](#fingerprint-check) - Sample identity checks within the run and against the fingerprint database of previous runs
-- [FastQ Screen](#fastq-screen) - Read-level contamination screening against multiple reference genomes
-- [Summary](#summary) - Compact per-case summary (CNV QC, purity, ploidy, TMB, MSI, HRD) on top of the report
+- [Fingerprint check](#fingerprint-check) - Sample identity checks within the run and against the fingerprint database of previous runs, with fingerprint QC (any assay, BAM input)
+- [FastQ Screen](#fastq-screen) - Read-level contamination / species screening against multiple reference genomes (any assay, single- or paired-end)
+- [DRAGEN CNV QC](#dragen-cnv-qc) - QC of **DRAGEN** CNV caller output (DRAGEN only)
+- [VAF histogram](#vaf-histogram) - Variant allele fraction histogram per sample (any caller)
+- [Summary](#summary) - Compact per-case summary (CNV QC, purity, ploidy, TMB, MSI, HRD) on top of the report (DRAGEN output)
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
 
@@ -23,8 +23,10 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 <details markdown="1">
 <summary>Output files</summary>
 
+- `samtools/`
+  - `*.bai`: BAM indexes created for the fingerprint check.
 - `fingerprintcheck/`
-  - `crosscheck.crosscheck_metrics.txt`: Picard CrosscheckFingerprints of all BAMs of this run against each other; shown as table and heatmap in MultiQC.
+  - `crosscheck.crosscheck_metrics.txt`: Picard CrosscheckFingerprints of all BAMs of this run against each other (`CROSSCHECK_BY FILE`, with tumor-aware LOD scores); shown as table and heatmap in MultiQC. Main columns see below.
   - `fingerprints/<sample>_<runid>.fingerprint.vcf.gz` (+ `.tbi`): fingerprint of each sample after the [fingerprint QC](usage.md#fingerprint-qc) (Picard ExtractFingerprint, then bcftools annotate), VCF sample name `<sample>@<runid>`, one SNP per haplotype block. FORMAT fields `AD`, `DP` (Picard), `PL` (Picard; `0,0,0` at failed sites), `FT` (`PASS` or the failed filters `FpLowDepth`, `FpLowBaseQuality`, `FpNoLikelihoods`), `FPDP`, `FPAD`, `FPBQ` (depth, REF/ALT depth and mean base quality of the QC). The `##SAMPLE` header line holds the QC status, the values and the thresholds.
   - `qc/<sample>_<runid>.fingerprint_qc_summary.tsv`: fingerprint QC of the sample, one row with the columns of `fingerprint_database_qc.tsv` (see below).
   - `qc/<sample>_<runid>.fingerprint_qc_sites.tsv`: QC of each haplotype site: `#CHROM`, `POS`, `REF`, `ALT`, `FT`, `FPDP`, `FPAD`, `FPBQ`, `PL` (as written into the fingerprint).
@@ -42,6 +44,18 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
     - `fingerprint_database_matches_mqc.tsv` or, when nothing is reported, `fingerprint_database_matches_mqc.html`: MultiQC section "Crosscheck Fingerprints: Database matches".
 
 </details>
+
+Main columns of `crosscheck.crosscheck_metrics.txt`:
+
+| Column                                              | Meaning                                                                                             |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `LEFT_FILE` / `RIGHT_FILE`                          | The two BAM files compared.                                                                         |
+| `RESULT`                                            | `EXPECTED_MATCH`, `EXPECTED_MISMATCH`, `UNEXPECTED_MATCH`, `UNEXPECTED_MISMATCH` or `INCONCLUSIVE`. |
+| `LOD_SCORE`                                         | Log-odds that both files come from the same individual (positive = match).                          |
+| `LOD_SCORE_TUMOR_NORMAL` / `LOD_SCORE_NORMAL_TUMOR` | Tumor-aware LOD scores (loss of heterozygosity taken into account).                                 |
+
+`INCONCLUSIVE` usually means too few haplotype-map SNPs were covered. This is expected for small
+gene panels with a genome-wide haplotype map; see [usage: assay-type notes](usage.md#assay-type-notes).
 
 Columns of `fingerprint_database_matches.tsv`:
 
@@ -100,7 +114,8 @@ Columns of `fingerprint_database_qc.tsv` (one row per sample of this run; the sa
 
 </details>
 
-FastQ Screen is executed when `--enable_fastqscreen` is set. The `*_screen.txt` files are automatically collected by MultiQC.
+Written when `--enable_fastqscreen` is true (default). Paired-end samples are screened with `--paired`,
+single-end samples read by read. The `*_screen.txt` files are automatically collected by MultiQC.
 
 ### DRAGEN CNV QC
 
@@ -108,13 +123,15 @@ FastQ Screen is executed when `--enable_fastqscreen` is set. The `*_screen.txt` 
 <summary>Output files</summary>
 
 - `cnv-metrics/`
-  - `cnv-metrics.csv`: one row per sample with `QC_STATUS` (`PASS`/`FAIL`), `QC_FAIL_REASONS` (`none`, or the failed checks separated by `;`, e.g. `EstimatedTumorPurity:0.25<0.3`) and the DRAGEN CNV metrics the checks use. Shown in the MultiQC section "CNV QC Metrics".
-  - `purcov_maxmodel_lineplot.json`: maximum log-likelihood per purity of the DRAGEN purity/coverage models, for the MultiQC section "CNV: Purity/Coverage Model".
+  - `cnv-metrics.csv`: one row per sample with `QC_STATUS` (`PASS`/`FAIL`), `QC_FAIL_REASONS` (`none`, or the failed checks separated by `;`, e.g. `EstimatedTumorPurity:0.25<0.3`) and the DRAGEN CNV metrics the checks use. Shown in the MultiQC section "DRAGEN CNV QC Metrics".
+  - `purcov_maxmodel_lineplot.json`: maximum log-likelihood per purity of the DRAGEN purity/coverage models, for the MultiQC section "DRAGEN CNV: Purity/Coverage Model".
   - `karyoplot-<sample>-tn_mqc.png`, `karyoplot-<sample>-tumor.baf_mqc.png`: genome-wide tumor/normal ratio and tumor B-allele frequency.
 
 </details>
 
-The thresholds are described in [usage: DRAGEN CNV QC](usage.md#dragen-cnv-qc).
+Written only when `--enable_cnvqc` is true (default). This step is **specific to DRAGEN CNV caller
+output** and is not run for other callers. The thresholds are described in
+[usage: DRAGEN CNV QC](usage.md#dragen-cnv-qc).
 
 ### VAF histogram
 
@@ -173,7 +190,9 @@ With `--multiqc_report_name <name>` (e.g. the run ID), these are named `<name>.h
 
 [MultiQC](http://multiqc.info) is a visualization tool that generates a single HTML report summarising all samples in your project. Most of the pipeline QC results are visualised in the report and further statistics are available in the report data directory.
 
-Results generated by MultiQC collate pipeline QC from supported tools (including FastQ Screen when enabled). The pipeline has special steps which also allow the software versions to be reported in the MultiQC output for future traceability. For more information about how to use MultiQC reports, see <http://multiqc.info>.
+Results generated by MultiQC collate pipeline QC from supported tools (including FastQ Screen when enabled) and
+everything MultiQC recognises in `--multiqc_inputs` and `--dragen_dirs`. For DRAGEN this includes mapping metrics,
+WGS coverage (genomes) or target-region coverage (panels/exomes), and variant-calling metrics. The pipeline has special steps which also allow the software versions to be reported in the MultiQC output for future traceability. For more information about how to use MultiQC reports, see <http://multiqc.info>.
 
 ### Pipeline information
 
@@ -182,8 +201,8 @@ Results generated by MultiQC collate pipeline QC from supported tools (including
 
 - `pipeline_info/`
   - Reports generated by Nextflow: `execution_report.html`, `execution_timeline.html`, `execution_trace.txt` and `pipeline_dag.dot`/`pipeline_dag.svg`.
-  - Reports generated by the pipeline: `pipeline_report.html`, `pipeline_report.txt` and `software_versions.yml`. The `pipeline_report*` files will only be present if the `--email` / `--email_on_fail` parameter's are used when running the pipeline.
-  - Reformatted samplesheet files used as input to the pipeline: `samplesheet.valid.csv`.
+  - `sequencingqc_software_mqc_versions.yml`: versions of all tools used.
+  - Reports generated by the pipeline: `pipeline_report.html`, `pipeline_report.txt`. The `pipeline_report*` files will only be present if the `--email` / `--email_on_fail` parameter's are used when running the pipeline.
   - Parameters used by the pipeline run: `params.json`.
 
 </details>
