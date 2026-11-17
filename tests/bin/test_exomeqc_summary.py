@@ -2,8 +2,8 @@
 """Unit tests for bin/exomeqc_summary.py (run: pytest tests/bin)."""
 
 import csv
-import json
 import importlib.util
+import json
 import shutil
 from pathlib import Path
 
@@ -45,7 +45,7 @@ def test_full_run(tmp_path, monkeypatch):
     assert rows["caseA"] == {
         "sample": "caseA",
         "cnv_qc": "PASS",
-        "purity": "0.62",
+        "purity": "62%",
         "ploidy": "2.05",
         "tmb": "4.1",
         "msi": "1.0",

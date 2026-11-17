@@ -259,6 +259,11 @@ write_plain_csv <- function(df, outfile) {
     ordered_cols <- c("sample", setdiff(names(df), "sample"))
     df <- df[, ordered_cols, drop = FALSE]
   }
+  # Store numeric-looking text (e.g. VCF header metrics) as numbers, so that
+  # write.csv does not quote it; MultiQC treats quoted values as strings.
+  df[] <- lapply(df, function(x) {
+    if (is.character(x)) utils::type.convert(x, as.is = TRUE) else x
+  })
   utils::write.csv(df, file = outfile, row.names = FALSE, quote = TRUE)
 }
 
@@ -859,12 +864,7 @@ evaluate_qc_status <- function(all_metrics_df, thresholds) {
   })
 
   qc_status_df <- as.data.frame(t(qc_status), stringsAsFactors = FALSE)
-  # 'sample' must be the first column: MultiQC custom content uses it as row ID.
-  cbind(
-    all_metrics_df["sample"],
-    qc_status_df,
-    all_metrics_df[setdiff(names(all_metrics_df), "sample")]
-  )
+  cbind(qc_status_df, all_metrics_df)
 }
 
 # Merge all metric sources by sample and keep all samples for QC reporting.
@@ -931,7 +931,17 @@ run_self_tests <- function() {
   )
 
   qc <- evaluate_qc_status(mock, parse_thresholds(list(pmad_max = "0.2")))
-  stopifnot(identical(names(qc)[1:3], c("sample", "QC_STATUS", "QC_FAIL_REASONS")))
+  # write_plain_csv: 'sample' first, numeric text unquoted (MultiQC parses
+  # quoted values as strings and draws no bars for them)
+  tmp_csv <- tempfile(fileext = ".csv")
+  write_plain_csv(
+    data.frame(QC_STATUS = "PASS", sample = "S1", PMAD = "0.1", NORMAL_SEX = "XX",
+               EstimatedTumorPurity = NA_character_, stringsAsFactors = FALSE),
+    tmp_csv
+  )
+  csv_lines <- readLines(tmp_csv)
+  stopifnot(identical(csv_lines[1], '"sample","QC_STATUS","PMAD","NORMAL_SEX","EstimatedTumorPurity"'))
+  stopifnot(identical(csv_lines[2], '"S1","PASS",0.1,"XX",NA'))
   stopifnot(qc$QC_STATUS[qc$sample == "S1"] == "PASS")
   stopifnot(qc$QC_STATUS[qc$sample == "S2"] == "FAIL")
   stopifnot(qc$QC_STATUS[qc$sample == "S3"] == "FAIL")

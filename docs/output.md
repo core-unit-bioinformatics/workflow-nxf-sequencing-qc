@@ -149,7 +149,7 @@ The parameters are described in [usage: VAF histogram](usage.md#vaf-histogram).
 | -------- | ---------------------------------------------------------------------------------------------- |
 | `sample` | DRAGEN case (output file prefix)                                                               |
 | `cnv_qc` | `PASS`/`FAIL` from CNV QC (`n/a` if CNV QC is disabled or the case is missing)                 |
-| `purity` | DRAGEN `EstimatedTumorPurity`                                                                  |
+| `purity` | DRAGEN `EstimatedTumorPurity`, in %                                                                 |
 | `ploidy` | DRAGEN `OverallPloidy`                                                                         |
 | `tmb`    | DRAGEN `TMB` (mut/Mb)                                                                          |
 | `msi`    | DRAGEN `PercentageUnstableSites`; suffix `(invalid)` if `ResultIsValid` is false               |

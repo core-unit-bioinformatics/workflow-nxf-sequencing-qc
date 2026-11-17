@@ -1,4 +1,4 @@
-"sample","QC_STATUS","QC_FAIL_REASONS","EstimatedTumorPurity","OverallPloidy","PMAD"
-"caseA","PASS","none","0.62","2.05","0.11"
-"caseB","FAIL","PMAD=0.31>0.2;NoModelFound:EstimatedTumorPurity=NA",NA,"3.10","0.31"
-"caseC","PASS","none","0.35","1.98","0.12"
+"sample","QC_STATUS","QC_FAIL_REASONS","ModelSource","EstimatedTumorPurity","DiploidCoverage","OverallPloidy","HomozygosityIndex","AlternativeModelDedupPurity","NORMAL_SEX","TUMOR_SEX","OutlierBafFraction","PMAD","Coverage MAD","Number of segments"
+"caseA","PASS","none","PURITY_MODEL",0.62,95.3,2.05,0.08,0.58,"XX","XX",0.004,0.11,0.09,212
+"caseB","FAIL","PMAD=0.31>0.2;NoModelFound:EstimatedTumorPurity=NA","NONE",NA,88.1,3.1,0.21,0.33,"XY","XY",0.031,0.31,0.27,840
+"caseC","PASS","none","PURITY_MODEL",0.35,101.7,1.98,0.05,0.41,"XX","XX",0.002,0.12,0.1,95

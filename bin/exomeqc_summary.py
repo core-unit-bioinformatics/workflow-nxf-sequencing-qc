@@ -262,6 +262,12 @@ def to_float(value: str | None) -> float | None:
         return None
 
 
+def pct(value: str | None) -> str:
+    """Fraction (0.62) as whole percent (62%)."""
+    num = to_float(value)
+    return NA if num is None else f"{num * 100:.0f}%"
+
+
 def fmt(value: str | None, digits: int) -> str:
     num = to_float(value)
     if num is None:
@@ -285,7 +291,7 @@ def summary_rows(
         row = {
             "case": case,
             "cnv_qc": status,
-            "purity": fmt(cnv_row.get(CNV_PURITY), 2),
+            "purity": pct(cnv_row.get(CNV_PURITY)),
             "ploidy": fmt(cnv_row.get(CNV_PLOIDY), 2),
             "tmb": fmt(bio.get(TMB_KEY), 1),
             "msi": msi,
