@@ -372,6 +372,10 @@
         "homozygosity_index_max": {
             "description": "CNV QC: fail a sample if HomozygosityIndex (CNV VCF header) is above this value. Not checked if unset.",
             "type": "string"
+        },
+        "total_excluded_bp_max": {
+            "description": "CNV QC: fail a sample if the total length of the excluded intervals (*.cnv.excluded_intervals.bed.gz, in bp) is above this value. Not checked if unset.",
+            "type": "string"
         }
     }
 }

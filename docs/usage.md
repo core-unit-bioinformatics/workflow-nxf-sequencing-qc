@@ -137,6 +137,7 @@ A sample always fails if DRAGEN found no purity model (`EstimatedTumorPurity=NA`
 | `num_segments_max`              | `Number of segments` (cnv_metrics.csv)                       | value > max      |
 | `filtered_records_relative_max` | `Number of filtered records (total)` percentage (cnv_metrics.csv) | value > max |
 | `homozygosity_index_max`        | `HomozygosityIndex` (CNV VCF header)                         | value > max      |
+| `total_excluded_bp_max`         | total bp in `*.cnv.excluded_intervals.bed.gz` (`total_excluded_bp`) | value > max |
 
 The limits themselves pass (e.g. a purity of exactly `purity_min` passes). Purity is a fraction: `--purity_min 0.4` means 40 %. A value outside [0, 1] (e.g. `40`) stops the pipeline with an `ERROR`, as does any non-numeric threshold or an unknown option passed to the script.
 
