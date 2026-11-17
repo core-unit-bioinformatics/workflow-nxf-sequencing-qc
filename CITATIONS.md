@@ -1,4 +1,4 @@
-# core-unit-bioinformatics/exomeqc: Citations
+# core-unit-bioinformatics/workflow-nxf-sequencing-qc: Citations
 
 ## [nf-core](https://pubmed.ncbi.nlm.nih.gov/32055031/)
 

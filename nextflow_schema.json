@@ -1,8 +1,8 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/exomeqc/main/nextflow_schema.json",
-    "title": "core-unit-bioinformatics/exomeqc pipeline parameters",
-    "description": "Quality control for short-read exome sequencing runs.",
+    "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/workflow-nxf-sequencing-qc/main/nextflow_schema.json",
+    "title": "core-unit-bioinformatics/workflow-nxf-sequencing-qc pipeline parameters",
+    "description": "Quality control for short-read sequencing runs (panels, exomes, genomes).",
     "type": "object",
     "$defs": {
         "input_output_options": {

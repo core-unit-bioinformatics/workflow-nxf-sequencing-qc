@@ -14,7 +14,7 @@ include { samplesheetToList       } from 'plugin/nf-schema'
 include { paramsSummaryMap        } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc    } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML  } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { methodsDescriptionText  } from '../subworkflows/local/utils_nfcore_exomeqc_pipeline'
+include { methodsDescriptionText  } from '../subworkflows/local/utils_nfcore_sequencingqc_pipeline'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -22,7 +22,7 @@ include { methodsDescriptionText  } from '../subworkflows/local/utils_nfcore_exo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-workflow EXOMEQC {
+workflow SEQUENCINGQC {
 
     take:
     ch_samplesheet // channel: samplesheet read in from --input
@@ -186,7 +186,7 @@ workflow EXOMEQC {
         .mix(topic_versions_string)
         .collectFile(
             storeDir: "${outdir}/pipeline_info",
-            name:  'exomeqc_software_'  + 'mqc_'  + 'versions.yml',
+            name:  'sequencingqc_software_'  + 'mqc_'  + 'versions.yml',
             sort: true,
             newLine: true
         )

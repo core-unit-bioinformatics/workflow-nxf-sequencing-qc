@@ -1,4 +1,4 @@
-# core-unit-bioinformatics/exomeqc: Output
+# core-unit-bioinformatics/workflow-nxf-sequencing-qc: Output
 
 ## Introduction
 

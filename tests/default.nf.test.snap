@@ -49,7 +49,7 @@
                     "untar": 1.34
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/exomeqc": "v1.0.0"
+                    "core-unit-bioinformatics/workflow-nxf-sequencing-qc": "v1.0.0"
                 }
             },
             [
@@ -151,7 +151,7 @@
                 "multiqc/Exome-Sequencing_multiqc_report_data/picard_crosscheckfingerprints.txt",
                 "multiqc/Exome-Sequencing_multiqc_report_plots",
                 "pipeline_info",
-                "pipeline_info/exomeqc_software_mqc_versions.yml",
+                "pipeline_info/sequencingqc_software_mqc_versions.yml",
                 "samtools",
                 "samtools/SEQC2_EXOME_HCC1395.bam.bai",
                 "samtools/SEQC2_EXOME_HCC1395BL.bam.bai",

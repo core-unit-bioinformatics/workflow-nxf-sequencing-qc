@@ -1,5 +1,5 @@
 //
-// Subworkflow with functionality specific to the core-unit-bioinformatics/exomeqc pipeline
+// Subworkflow with functionality specific to the core-unit-bioinformatics/workflow-nxf-sequencing-qc pipeline
 //
 
 /*

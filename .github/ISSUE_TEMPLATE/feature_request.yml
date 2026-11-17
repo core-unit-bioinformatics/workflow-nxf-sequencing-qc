@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest an idea for the core-unit-bioinformatics/exomeqc pipeline
+description: Suggest an idea for the core-unit-bioinformatics/workflow-nxf-sequencing-qc pipeline
 labels: enhancement
 body:
   - type: textarea

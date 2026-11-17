@@ -311,7 +311,7 @@ build_purity_model_lineplot_json <- function(pur_cov_model_long_df) {
 
   paste0(
     "{\n",
-    "  \"id\": \"exomeqc_purcov_maxmodel\",\n",
+    "  \"id\": \"dragen_cnv_qc_purcov_maxmodel\",\n",
     "  \"plot_type\": \"linegraph\",\n",
     "  \"data\": {", paste(sample_entries, collapse = ","), "}\n",
     "}\n"
