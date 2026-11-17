@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compact **Summary** section on top of the MultiQC report: per case CNV QC, purity, ploidy, TMB, MSI and HRD (DRAGEN), run-level CNV QC and fingerprint status; full biomarker values, CNV fail reasons, unexpected fingerprint pairs and incomplete cases in collapsed details (`EXOMEQC_SUMMARY`, `bin/exomeqc_summary.py`).
 - Params `enable_summary`, `summary_tmb_high`, `summary_msi_high`, `summary_hrd_high` (highlight cutoffs, unset by default).
 - Outputs `summary/exomeqc_summary.tsv` and `summary/biomarker.tsv`.
+- `-profile test` now runs on SEQC2 HCC1395/HCC1395BL tumor/normal data (gene panel, exome and genome,
+  ALK region, GRCh38) hosted on the `test-datasets` branch, with a FastQ Screen database and haplotype map.
+- `--fastqscreen_database` accepts a `.tar.gz` of the database directory (unpacked with nf-core `untar`).
 
 ### `Fixed`
 

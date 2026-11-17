@@ -83,7 +83,7 @@ To enable FastQ Screen and include its metrics in MultiQC, add:
 --enable_fastqscreen --fastqscreen_database /path/to/FastQ_Screen_Genomes
 ```
 
-The `--fastqscreen_database` directory must contain `fastq_screen.conf` and the referenced genome index folders.
+The `--fastqscreen_database` directory must contain `fastq_screen.conf` and the referenced genome index folders. It can also be given as a `.tar.gz` of that directory (local path or URL); the pipeline unpacks it into a directory named like the archive without `.tar.gz`. `DATABASE` paths in `fastq_screen.conf` must be absolute or relative to the parent of the database directory (`<database_dir_name>/<genome>/<index_prefix>`).
 
 ### Fingerprint check and fingerprint database
 
@@ -315,6 +315,48 @@ To further assist in reproducibility, you can use share and reuse [parameter fil
 > [!TIP]
 > If you wish to share such profile (such as upload as supplementary material for academic publications), make sure to NOT include cluster specific paths to files, nor institutional specific profiles.
 
+## Test profile
+
+`-profile test` runs the pipeline on a small public dataset, downloaded on the fly, so no
+other parameters are needed:
+
+```bash
+nextflow run core-unit-bioinformatics/exomeqc -profile test,<docker/singularity/conda> --outdir results_test
+```
+
+The test data are SEQC2 reference samples HCC1395 (tumor) and HCC1395BL (matched normal),
+one pair each for **gene panel** (AmpliSeq), **exome** (WES) and **genome** (WGS), sliced to
+`chr2:29700000-29740000` (GRCh38, ALK). With them come a FastQ Screen database (human region
+and PhiX, `.tar.gz`) and a Picard haplotype map of common 1000 Genomes SNPs in that region.
+
+| Step              | In the test profile | Expected result                                                              |
+| ----------------- | ------------------- | ---------------------------------------------------------------------------- |
+| FastQ Screen      | on                  | 97-100 % of reads hit `Human`, none hit `PhiX`                                |
+| Fingerprint check | on                  | see below                                                                    |
+| DRAGEN CNV QC     | off                 | not run; SEQC2 has no DRAGEN CNV output                                       |
+| MultiQC           | always              | report with FastQ Screen and Picard fingerprint sections                     |
+
+Fingerprint results on the test data (reference run with conda, 2026-11-17) show what the
+check can and cannot tell on small regions:
+
+- **Panel samples: `INCONCLUSIVE`** (LOD 0), even against themselves. None of the 24
+  haplotype-map SNPs fall inside the AmpliSeq amplicons. This is the panel restriction
+  described under [Fingerprint check](#fingerprint-check).
+- **Same tissue across assays matches:** tumor exome vs tumor genome LOD +2.1, normal exome
+  vs normal genome LOD +0.4.
+- **Tumor vs normal is negative** (genome: LOD -41, tumor-aware -5), although both come from
+  the same donor. HCC1395 carries allelic changes in this region that the tumor-aware model
+  does not fully absorb. Picard labels these pairs `EXPECTED_MISMATCH` only because their
+  read-group sample names differ.
+
+The test profile checks that the steps run. It is not a benchmark of identity calling.
+
+The data live on the `test-datasets` branch of the pipeline repository
+(`params.pipelines_testdata_base_path`). How they were made, with the script to rebuild them,
+is described in `seqc2/README.md` there. For offline/HPC use, download that folder, point
+`--pipelines_testdata_base_path` to its parent directory, and rewrite the URLs in
+`seqc2/samplesheet.csv` to local paths.
+
 ## Core Nextflow arguments
 
 > [!NOTE]
@@ -337,7 +379,7 @@ They are loaded in sequence, so later profiles can overwrite earlier profiles.
 If `-profile` is not specified, the pipeline will run locally and expect all software to be installed and available on the `PATH`. This is _not_ recommended, since it can lead to different results on different machines dependent on the computer environment.
 
 - `test`
-  - A profile with a complete configuration for automated testing
+  - A profile with a complete configuration for automated testing, see [Test profile](#test-profile)
   - Includes links to test data so needs no other parameters
 - `docker`
   - A generic configuration profile to be used with [Docker](https://docker.com/)
