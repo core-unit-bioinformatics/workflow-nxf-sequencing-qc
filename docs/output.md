@@ -54,7 +54,7 @@ The thresholds are described in [usage: DRAGEN CNV QC](usage.md#dragen-cnv-qc).
 
 - `vaf-histogram/`
   - `vaf_histogram.tsv`: variants per histogram and VAF bin. Columns: `sample` (histogram name: the samplesheet sample, or `<sample>_<column>` if several VCF columns are counted), `vcf_sample` (VCF column), `vcf` (file name), `bin_start`, `bin_end` (bin [start, end); the last bin includes 1.0), `variants`.
-  - `vaf_histogram_summary.tsv`: per histogram, the VAF source and what was read and counted. Columns: `sample`, `vcf_sample`, `vcf`, `vaf_source` (`FORMAT_AF` or `FORMAT_AD`), `records_read`, `records_filtered` (skipped, FILTER not PASS), `alleles_counted`, `alleles_non_variant` (skipped, ALT `.`, `*`, `<NON_REF>` or `<*>`), `alleles_not_in_genotype` (skipped, ALT allele not in the sample's GT, e.g. hom-ref or no-call), `records_filter_missing` (records with FILTER `.`, no filters applied, counted like `PASS`).
+  - `vaf_histogram_summary.tsv`: per histogram, the VAF source and what was read and counted. Columns: `sample`, `vcf_sample`, `vcf`, `vaf_source` (`FORMAT_AF` or `FORMAT_AD`), `records_read`, `records_filtered` (skipped, FILTER not PASS or `.`), `alleles_counted`, `alleles_non_variant` (skipped, ALT `.`, `*`, `<NON_REF>` or `<*>`), `alleles_not_in_genotype` (skipped, ALT allele not in the sample's GT, e.g. hom-ref or no-call), `records_filter_missing` (records with FILTER `.`, no filters applied, counted like `PASS`).
   - `vaf_histogram_mqc.json`: the MultiQC section "Variant allele fraction".
 
 </details>
