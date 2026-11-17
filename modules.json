@@ -1,6 +1,6 @@
 {
-    "name": "core-unit-bioinformatics/exomeqc",
-    "homePage": "https://github.com/core-unit-bioinformatics/exomeqc",
+    "name": "core-unit-bioinformatics/workflow-nxf-sequencing-qc",
+    "homePage": "https://github.com/core-unit-bioinformatics/workflow-nxf-sequencing-qc",
     "repos": {
         "https://github.com/nf-core/modules.git": {
             "modules": {

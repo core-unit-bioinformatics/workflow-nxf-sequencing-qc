@@ -3,7 +3,7 @@
         "content": [
             {
                 "Workflow": {
-                    "core-unit-bioinformatics/exomeqc": "v1.0.0"
+                    "core-unit-bioinformatics/workflow-nxf-sequencing-qc": "v1.0.0"
                 }
             },
             [
@@ -21,7 +21,7 @@
         "content": [
             {
                 "Workflow": {
-                    "core-unit-bioinformatics/exomeqc": "v1.0.0"
+                    "core-unit-bioinformatics/workflow-nxf-sequencing-qc": "v1.0.0"
                 }
             },
             [

@@ -49,7 +49,7 @@ nextflow_pipeline {
                 { assert path("${outputDir}/multiqc/Exome-Sequencing_multiqc_report.html").text.contains('Variant allele fraction') },
                 { assert snapshot(
                     // versions without the Nextflow version (tested on several Nextflow versions)
-                    removeNextflowVersion("$outputDir/pipeline_info/exomeqc_software_mqc_versions.yml"),
+                    removeNextflowVersion("$outputDir/pipeline_info/sequencingqc_software_mqc_versions.yml"),
                     path("$outputDir/vaf-histogram/vaf_histogram.tsv"),
                     path("$outputDir/vaf-histogram/vaf_histogram_summary.tsv")
                 ).match() }

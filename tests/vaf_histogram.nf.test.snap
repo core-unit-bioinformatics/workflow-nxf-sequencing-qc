@@ -6,7 +6,7 @@
                     "python": "3.12.16"
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/exomeqc": "v1.0.0"
+                    "core-unit-bioinformatics/workflow-nxf-sequencing-qc": "v1.0.0"
                 }
             },
             "vaf_histogram.tsv:md5,644c34001a731f50de45455b23bc3964",

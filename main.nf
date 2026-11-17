@@ -1,9 +1,9 @@
 #!/usr/bin/env nextflow
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    core-unit-bioinformatics/exomeqc
+    core-unit-bioinformatics/workflow-nxf-sequencing-qc
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Github : https://github.com/core-unit-bioinformatics/exomeqc
+    Github : https://github.com/core-unit-bioinformatics/workflow-nxf-sequencing-qc
 ----------------------------------------------------------------------------------------
 */
 
@@ -13,10 +13,10 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { EXOMEQC  } from './workflows/exomeqc'
-include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_exomeqc_pipeline'
-include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_exomeqc_pipeline'
-include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_exomeqc_pipeline'
+include { SEQUENCINGQC  } from './workflows/sequencingqc'
+include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_sequencingqc_pipeline'
+include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_sequencingqc_pipeline'
+include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_sequencingqc_pipeline'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -38,7 +38,7 @@ params.fasta       = getGenomeAttribute('fasta')
 //
 // WORKFLOW: Run main analysis pipeline depending on type of input
 //
-workflow COREUNITBIOINFORMATICS_EXOMEQC {
+workflow COREUNITBIOINFORMATICS_SEQUENCINGQC {
 
     take:
     samplesheet // channel: samplesheet read in from --input
@@ -48,7 +48,7 @@ workflow COREUNITBIOINFORMATICS_EXOMEQC {
     //
     // WORKFLOW: Run pipeline
     //
-    EXOMEQC (
+    SEQUENCINGQC (
         samplesheet,
         params.multiqc_config,
         params.multiqc_logo,
@@ -56,7 +56,7 @@ workflow COREUNITBIOINFORMATICS_EXOMEQC {
         params.outdir,
     )
     emit:
-    multiqc_report = EXOMEQC.out.multiqc_report // channel: /path/to/multiqc_report.html
+    multiqc_report = SEQUENCINGQC.out.multiqc_report // channel: /path/to/multiqc_report.html
 }
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,7 +85,7 @@ workflow {
     //
     // WORKFLOW: Run main workflow
     //
-    COREUNITBIOINFORMATICS_EXOMEQC (
+    COREUNITBIOINFORMATICS_SEQUENCINGQC (
         PIPELINE_INITIALISATION.out.samplesheet
     )
     //
@@ -97,7 +97,7 @@ workflow {
         params.plaintext_email,
         params.outdir,
         params.monochrome_logs,
-        COREUNITBIOINFORMATICS_EXOMEQC.out.multiqc_report
+        COREUNITBIOINFORMATICS_SEQUENCINGQC.out.multiqc_report
     )
 }
 

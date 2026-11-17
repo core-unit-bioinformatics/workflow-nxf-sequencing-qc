@@ -1,17 +1,17 @@
 lint:
   files_exist:
     - CODE_OF_CONDUCT.md
-    - assets/nf-core-exomeqc_logo_light.png
-    - docs/images/nf-core-exomeqc_logo_light.png
-    - docs/images/nf-core-exomeqc_logo_dark.png
+    - assets/nf-core-sequencingqc_logo_light.png
+    - docs/images/nf-core-sequencingqc_logo_light.png
+    - docs/images/nf-core-sequencingqc_logo_dark.png
     - .github/ISSUE_TEMPLATE/config.yml
     - .github/workflows/awstest.yml
     - .github/workflows/awsfulltest.yml
   files_unchanged:
     - CODE_OF_CONDUCT.md
-    - assets/nf-core-exomeqc_logo_light.png
-    - docs/images/nf-core-exomeqc_logo_light.png
-    - docs/images/nf-core-exomeqc_logo_dark.png
+    - assets/nf-core-sequencingqc_logo_light.png
+    - docs/images/nf-core-sequencingqc_logo_light.png
+    - docs/images/nf-core-sequencingqc_logo_dark.png
     - .github/ISSUE_TEMPLATE/bug_report.yml
     - .github/CONTRIBUTING.md
     - .github/PULL_REQUEST_TEMPLATE.md
@@ -26,10 +26,10 @@ nf_core_version: 4.2.2
 repository_type: pipeline
 template:
   author: Kai Horny
-  description: Quality control for short-read exome sequencing runs.
+  description: Quality control for short-read sequencing runs (panels, exomes, genomes).
   force: false
   is_nfcore: false
-  name: exomeqc
+  name: sequencingqc
   org: core-unit-bioinformatics
   outdir: .
   skip_features:

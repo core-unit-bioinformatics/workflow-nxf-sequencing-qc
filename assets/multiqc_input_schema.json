@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/exomeqc/main/assets/multiqc_input_schema.json",
-    "title": "core-unit-bioinformatics/exomeqc pipeline - params.multiqc_inputs schema",
+    "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/workflow-nxf-sequencing-qc/main/assets/multiqc_input_schema.json",
+    "title": "core-unit-bioinformatics/workflow-nxf-sequencing-qc pipeline - params.multiqc_inputs schema",
     "description": "Schema for the file provided with params.multiqc_inputs",
     "type": "array",
     "items": {

@@ -4,4 +4,4 @@ contact_links:
     about: Please join the nf-core community here
   - name: "Slack #exomeqc channel"
     url: https://nfcore.slack.com/channels/exomeqc
-    about: Discussion about the core-unit-bioinformatics/exomeqc pipeline
+    about: Discussion about the core-unit-bioinformatics/workflow-nxf-sequencing-qc pipeline
