@@ -53,6 +53,19 @@ workflow SEQUENCINGQC {
             error("Please provide --fastqscreen_database when --enable_fastqscreen is set")
         }
 
+        // Assay-agnostic: works for panel, exome and genome FASTQs. Single-/paired-end
+        // is taken per sample from meta.single_end (see conf/modules.config).
+        ch_fastqscreen_input = ch_samplesheet
+            .map { meta, reads ->
+                def fastqs = reads.findAll { read -> read }
+                if (!fastqs) {
+                    error("FastQ Screen is enabled but sample '${meta.id}' has no 'fastq_1' in samplesheet '${params.input}'. " +
+                        "Expected: FASTQ path(s) in 'fastq_1' (and 'fastq_2' for paired-end); observed: empty. " +
+                        "Fix: add the FASTQ paths or set 'enable_fastqscreen: false' in a -params-file.")
+                }
+                [ meta, fastqs ]
+            }
+
         // The database is a directory or a .tar.gz of that directory (the only form
         // that can be fetched from a URL, e.g. in -profile test). The unpacked
         // directory keeps the archive name, so relative DATABASE paths in
@@ -67,7 +80,7 @@ workflow SEQUENCINGQC {
         }
 
         FASTQSCREEN_FASTQSCREEN(
-            ch_samplesheet,
+            ch_fastqscreen_input,
             ch_fastqscreen_db
         )
 
@@ -110,10 +123,13 @@ workflow SEQUENCINGQC {
     }
 
     if (params.enable_cnvqc) {
+        // CNV QC is the only caller-specific step: it parses DRAGEN CNV output only.
         if (!params.dragen_dirs) {
-            error("Please provide --dragen_dirs when --enable_cnvqc is set")
+            error("CNV QC is enabled but --dragen_dirs is not set. CNV QC only supports DRAGEN CNV caller output " +
+                "(*.cnv_metrics.csv, *.cnv.vcf.gz). Fix: set --dragen_dirs to the DRAGEN output directory, " +
+                "or set 'enable_cnvqc: false' in a -params-file for data from other CNV callers.")
         }
-        
+
         DRAGEN_CNV_QC(params.dragen_dirs)
 
         ch_multiqc_files       = ch_multiqc_files.mix(DRAGEN_CNV_QC.out.metrics)
