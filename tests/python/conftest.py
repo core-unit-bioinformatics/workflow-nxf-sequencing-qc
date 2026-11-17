@@ -64,8 +64,13 @@ def write_map(path, snps=SNPS, contigs=CONTIGS, column_header=None):
     Path(path).write_text("\n".join(lines) + "\n")
 
 
-def vcf_text(samples, records=None, contigs=CONTIGS, formats=("AD", "DP", "PL")):
-    """VCF text; records are (chrom, pos, ref, alt, [sample field strings])."""
+def vcf_text(
+    samples, records=None, contigs=CONTIGS, formats=("AD", "DP", "PL"), header_lines=()
+):
+    """VCF text; records are (chrom, pos, ref, alt, [sample field strings]).
+
+    header_lines: further header lines (e.g. ##SAMPLE) before the column header.
+    """
     if records is None:
         records = fingerprint_records(samples)
     lines = ["##fileformat=VCFv4.2"]
@@ -78,6 +83,7 @@ def vcf_text(samples, records=None, contigs=CONTIGS, formats=("AD", "DP", "PL"))
         "PL": "Number=G,Type=Integer",
     }
     lines += [f'##FORMAT=<ID={f},{descriptions[f]},Description="{f}">' for f in formats]
+    lines += list(header_lines)
     lines.append(
         "\t".join(
             ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]

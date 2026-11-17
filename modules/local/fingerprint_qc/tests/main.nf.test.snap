@@ -1,0 +1,156 @@
+{
+    "SYN001_3-N run B - all sites pass": {
+        "content": [
+            [
+                [
+                    {
+                        "id": "SYN001_3-N",
+                        "runid": "20260201_LH00001_0002_BFIXTURE02",
+                        "fingerprint_id": "SYN001_3-N@20260201_LH00001_0002_BFIXTURE02"
+                    },
+                    "SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_sites.tsv:md5,d4e82c0aa9663b76493e765ef7dda504"
+                ]
+            ],
+            [
+                [
+                    {
+                        "id": "SYN001_3-N",
+                        "runid": "20260201_LH00001_0002_BFIXTURE02",
+                        "fingerprint_id": "SYN001_3-N@20260201_LH00001_0002_BFIXTURE02"
+                    },
+                    "SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_header.txt:md5,2dc5fbb9646b1e5b59dec93af301c1bb"
+                ]
+            ],
+            [
+                [
+                    {
+                        "id": "SYN001_3-N",
+                        "runid": "20260201_LH00001_0002_BFIXTURE02",
+                        "fingerprint_id": "SYN001_3-N@20260201_LH00001_0002_BFIXTURE02"
+                    },
+                    "SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_summary.tsv:md5,908d2704b0e4de6fde305cbfd64ead43"
+                ]
+            ],
+            {
+                "versions_python": [
+                    [
+                        "FINGERPRINT_QC",
+                        "python",
+                        "3.12.16"
+                    ]
+                ],
+                "versions_pyvcf3": [
+                    [
+                        "FINGERPRINT_QC",
+                        "pyvcf3",
+                        "1.0.4"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-11-17T11:52:50.804647277",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "SYN001_3-N run B - stub": {
+        "content": [
+            {
+                "0": [
+                    [
+                        {
+                            "id": "SYN001_3-N",
+                            "runid": "20260201_LH00001_0002_BFIXTURE02",
+                            "fingerprint_id": "SYN001_3-N@20260201_LH00001_0002_BFIXTURE02"
+                        },
+                        "SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_sites.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "1": [
+                    [
+                        {
+                            "id": "SYN001_3-N",
+                            "runid": "20260201_LH00001_0002_BFIXTURE02",
+                            "fingerprint_id": "SYN001_3-N@20260201_LH00001_0002_BFIXTURE02"
+                        },
+                        "SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_header.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "2": [
+                    [
+                        {
+                            "id": "SYN001_3-N",
+                            "runid": "20260201_LH00001_0002_BFIXTURE02",
+                            "fingerprint_id": "SYN001_3-N@20260201_LH00001_0002_BFIXTURE02"
+                        },
+                        "SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_summary.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "3": [
+                    [
+                        "FINGERPRINT_QC",
+                        "python",
+                        "3.12.16"
+                    ]
+                ],
+                "4": [
+                    [
+                        "FINGERPRINT_QC",
+                        "pyvcf3",
+                        "1.0.4"
+                    ]
+                ],
+                "header": [
+                    [
+                        {
+                            "id": "SYN001_3-N",
+                            "runid": "20260201_LH00001_0002_BFIXTURE02",
+                            "fingerprint_id": "SYN001_3-N@20260201_LH00001_0002_BFIXTURE02"
+                        },
+                        "SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_header.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "sites": [
+                    [
+                        {
+                            "id": "SYN001_3-N",
+                            "runid": "20260201_LH00001_0002_BFIXTURE02",
+                            "fingerprint_id": "SYN001_3-N@20260201_LH00001_0002_BFIXTURE02"
+                        },
+                        "SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_sites.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "summary": [
+                    [
+                        {
+                            "id": "SYN001_3-N",
+                            "runid": "20260201_LH00001_0002_BFIXTURE02",
+                            "fingerprint_id": "SYN001_3-N@20260201_LH00001_0002_BFIXTURE02"
+                        },
+                        "SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_summary.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "versions_python": [
+                    [
+                        "FINGERPRINT_QC",
+                        "python",
+                        "3.12.16"
+                    ]
+                ],
+                "versions_pyvcf3": [
+                    [
+                        "FINGERPRINT_QC",
+                        "pyvcf3",
+                        "1.0.4"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-11-17T11:54:25.608036478",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}

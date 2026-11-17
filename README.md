@@ -30,6 +30,7 @@
    - crosscheck all BAMs of the run with each other ([`Picard CrosscheckFingerprints`](https://broadinstitute.github.io/picard/)), shown as heatmap
    - optionally align samples without BAM ([`bwa-mem2`](https://github.com/bwa-mem2/bwa-mem2), `--align_reads_for_fingerprint`)
    - extract one fingerprint per sample and run (`<sample>@<runid>`, [`Picard ExtractFingerprint`](https://broadinstitute.github.io/picard/))
+   - fingerprint QC: depth and base quality of each haplotype site with adjustable thresholds ([`samtools mpileup`](https://www.htslib.org/)), optional contamination estimate (off by default, not suited for tumours), QC status per sample; failed sites are masked and status, thresholds and values are stored in the fingerprint ([`bcftools`](https://samtools.github.io/bcftools/))
    - check the fingerprint database of previous runs (`--fingerprint_database`, plain VCF, gzip or bgzip) against the haplotype map ([`PyVCF3`](https://github.com/dridk/PyVCF3)), drop the fingerprints this run replaces (same `<sample>@<runid>`) and convert it to bgzip with index ([`bcftools`](https://samtools.github.io/bcftools/))
    - crosscheck the run against the database, before the run is added, and report matches with samples of other runs, with LOD scores
    - add the run to the database: updated database `exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` for the next run

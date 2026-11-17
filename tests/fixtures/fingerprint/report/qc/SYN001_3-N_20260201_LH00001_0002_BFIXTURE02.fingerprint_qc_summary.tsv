@@ -1,0 +1,2 @@
+fingerprint_id	sample	runid	status	failed_criteria	qc_date	exomeqc_version	haplotype_sites	passing_sites	fraction_passing_sites	sites_low_depth	sites_low_base_quality	sites_no_likelihoods	mean_site_depth	mean_site_base_quality	contamination	contamination_sites	min_base_quality	min_mapping_quality	min_site_depth	min_site_mean_base_quality	min_fraction_passing_sites	max_contamination
+SYN001_3-N@20260201_LH00001_0002_BFIXTURE02	SYN001_3-N	20260201_LH00001_0002_BFIXTURE02	PASS	.	2026-01-01	1.0.0	100	100	1.000	0	0	0	25.3	37.0	0.0000	100	20	20	10	25	0.5	0.03

@@ -1,0 +1,106 @@
+nextflow_process {
+
+    name "Test Process FINGERPRINT_QC"
+    script "../main.nf"
+    process "FINGERPRINT_QC"
+    config "./nextflow.config"
+
+    tag "modules"
+    tag "modules_local"
+    tag "fingerprint_qc"
+
+    // Synthetic fixtures, see tests/fixtures/fingerprint/make_fingerprint_fixtures.py:
+    // fingerprint and samtools mpileup of SYN001_3-N in run B (about 25 reads per site,
+    // base quality 37, mapping quality 60, no contamination).
+
+    test("SYN001_3-N run B - all sites pass") {
+
+        when {
+            process {
+                """
+                def report = "${projectDir}/tests/fixtures/fingerprint/report"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                input[0] = [
+                    [ id:'SYN001_3-N', runid: run_b, fingerprint_id: "SYN001_3-N@\${run_b}".toString() ],
+                    file("\${report}/SYN001_3-N_\${run_b}.fingerprint.vcf.gz", checkIfExists: true),
+                    file("\${report}/qc/SYN001_3-N_\${run_b}.mpileup.gz", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/fixtures/fingerprint/haplotype_map.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            def summary = path(process.out.summary[0][1]).readLines()
+            def values = [ summary[0].split('\t') as List, summary[1].split('\t') as List ].transpose().collectEntries()
+            assertAll(
+                { assert process.success },
+                { assert values.status == 'PASS' },
+                { assert values.passing_sites == '100' },
+                { assert values.contamination == '0.0000' },
+                { assert values.min_site_depth == '10' },
+                { assert path(process.out.header[0][1]).readLines().last().startsWith('##SAMPLE=<ID=SYN001_3-N@20260201_LH00001_0002_BFIXTURE02,ExomeqcFingerprintQC=PASS,') },
+                { assert path(process.out.sites[0][1]).readLines().size() == 101 },
+                { assert snapshot(
+                    process.out.sites,
+                    process.out.header,
+                    process.out.summary,
+                    process.out.findAll { key, val -> key.startsWith('versions') }
+                ).match() }
+            )
+        }
+    }
+
+    test("error - fingerprint of another sample") {
+
+        when {
+            process {
+                """
+                def report = "${projectDir}/tests/fixtures/fingerprint/report"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                input[0] = [
+                    [ id:'SYN002_1-T', runid: run_b, fingerprint_id: "SYN002_1-T@\${run_b}".toString() ],
+                    file("\${report}/SYN001_3-N_\${run_b}.fingerprint.vcf.gz", checkIfExists: true),
+                    file("\${report}/qc/SYN001_3-N_\${run_b}.mpileup.gz", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/fixtures/fingerprint/haplotype_map.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.failed },
+                { assert process.exitStatus == 1 },
+                { assert (process.stdout + process.stderr).join('\n').contains("expected the single sample 'SYN002_1-T@20260201_LH00001_0002_BFIXTURE02'") }
+            )
+        }
+    }
+
+    test("SYN001_3-N run B - stub") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                def report = "${projectDir}/tests/fixtures/fingerprint/report"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                input[0] = [
+                    [ id:'SYN001_3-N', runid: run_b, fingerprint_id: "SYN001_3-N@\${run_b}".toString() ],
+                    file("\${report}/SYN001_3-N_\${run_b}.fingerprint.vcf.gz", checkIfExists: true),
+                    file("\${report}/qc/SYN001_3-N_\${run_b}.mpileup.gz", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/fixtures/fingerprint/haplotype_map.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out).match() }
+            )
+        }
+    }
+}

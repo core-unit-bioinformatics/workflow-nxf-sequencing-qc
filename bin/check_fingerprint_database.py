@@ -85,7 +85,8 @@ VCF_READ_ERRORS = (
     zlib.error,
 )
 
-Snp = namedtuple("Snp", ["name", "major", "minor", "block"])
+# maf: the MAF column as text, converted and checked by the scripts that use it
+Snp = namedtuple("Snp", ["name", "major", "minor", "block", "maf"], defaults=("",))
 HaplotypeMap = namedtuple("HaplotypeMap", ["path", "contigs", "snps", "blocks"])
 
 
@@ -173,7 +174,7 @@ def read_haplotype_map(path):
     names = {fields[2] for _line_number, fields in rows}
     snps = {}
     for line_number, fields in rows:
-        chrom, position, name, major, minor, _maf, anchor, _panels = fields[:8]
+        chrom, position, name, major, minor, maf, anchor, _panels = fields[:8]
         source = f"{path} line {line_number}"
         # positions are 1-based integers on a contig of the dictionary
         if not position.isdigit() or int(position) < 1:
@@ -197,7 +198,7 @@ def read_haplotype_map(path):
         key = (chrom, int(position))
         if key in snps:
             fail(f"{source}: position {chrom}:{position} listed twice")
-        snps[key] = Snp(name, major, minor, anchor or name)
+        snps[key] = Snp(name, major, minor, anchor or name, maf)
     blocks = {snp.block for snp in snps.values()}
     info(
         f"read haplotype map {path}: {len(snps)} SNPs in {len(blocks)} haplotype blocks "

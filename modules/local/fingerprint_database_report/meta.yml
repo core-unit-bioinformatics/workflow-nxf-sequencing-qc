@@ -55,6 +55,10 @@ input:
         type: file
         description: CrosscheckFingerprints metrics of this run (INPUT) against the kept database fingerprints (SECOND_INPUT), CROSSCHECK_BY SAMPLE; `[]` if no fingerprint was kept
         pattern: "*.crosscheck_metrics.txt"
+    - qc_summaries:
+        type: file
+        description: Fingerprint QC summary of each sample of this run (FINGERPRINT_QC)
+        pattern: "*_summary.tsv"
 output:
   matches:
     - - meta:
@@ -80,6 +84,22 @@ output:
           type: file
           description: Counts of samples, fingerprints, comparisons and classes (metric, value)
           pattern: "*_summary.tsv"
+  qc:
+    - - meta:
+          type: map
+          description: Run-level metadata map
+      - "*_qc.tsv":
+          type: file
+          description: Fingerprint QC of each sample of this run (status, failed criteria, values, thresholds)
+          pattern: "*_qc.tsv"
+  qc_multiqc:
+    - - meta:
+          type: map
+          description: Run-level metadata map
+      - "*_qc_mqc.tsv":
+          type: file
+          description: MultiQC custom content table "Fingerprint QC"
+          pattern: "*_qc_mqc.tsv"
   overview:
     - - meta:
           type: map

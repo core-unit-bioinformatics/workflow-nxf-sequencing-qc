@@ -40,6 +40,8 @@ report_section_order:
   interop:
     order: 970
   exomeqc_fingerprint_overview:
+    order: 962
+  exomeqc_fingerprint_qc:
     order: 961
   picard:
     order: 960

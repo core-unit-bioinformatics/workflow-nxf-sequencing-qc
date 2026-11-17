@@ -1,0 +1,90 @@
+{
+    "database of run A and B - stub": {
+        "content": [
+            {
+                "0": [
+                    [
+                        {
+                            "id": "exomeqc_fingerprint_database"
+                        },
+                        "exomeqc_fingerprint_database_header.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "1": [
+                    [
+                        "FINGERPRINT_DATABASE_HEADER",
+                        "python",
+                        "3.12.16"
+                    ]
+                ],
+                "2": [
+                    [
+                        "FINGERPRINT_DATABASE_HEADER",
+                        "pyvcf3",
+                        "1.0.4"
+                    ]
+                ],
+                "header": [
+                    [
+                        {
+                            "id": "exomeqc_fingerprint_database"
+                        },
+                        "exomeqc_fingerprint_database_header.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "versions_python": [
+                    [
+                        "FINGERPRINT_DATABASE_HEADER",
+                        "python",
+                        "3.12.16"
+                    ]
+                ],
+                "versions_pyvcf3": [
+                    [
+                        "FINGERPRINT_DATABASE_HEADER",
+                        "pyvcf3",
+                        "1.0.4"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-11-17T11:57:03.308562549",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "database of run A and B - one QC line per fingerprint": {
+        "content": [
+            [
+                [
+                    {
+                        "id": "exomeqc_fingerprint_database"
+                    },
+                    "exomeqc_fingerprint_database_header.txt:md5,85b921860c36ad370d3c4ed5a66a9d02"
+                ]
+            ],
+            {
+                "versions_python": [
+                    [
+                        "FINGERPRINT_DATABASE_HEADER",
+                        "python",
+                        "3.12.16"
+                    ]
+                ],
+                "versions_pyvcf3": [
+                    [
+                        "FINGERPRINT_DATABASE_HEADER",
+                        "pyvcf3",
+                        "1.0.4"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-11-17T11:55:32.006302127",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}
