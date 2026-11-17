@@ -24,15 +24,19 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 
 - `fingerprintcheck/`
   - `crosscheck.crosscheck_metrics.txt`: Picard CrosscheckFingerprints of all BAMs of this run against each other; shown as table and heatmap in MultiQC.
-  - `fingerprints/<sample>_<runid>.fingerprint.vcf.gz` (+ `.tbi`): fingerprint of each sample (Picard ExtractFingerprint), VCF sample name `<sample>@<runid>`, FORMAT fields `AD`, `DP`, `PL` at the haplotype map SNPs.
+  - `fingerprints/<sample>_<runid>.fingerprint.vcf.gz` (+ `.tbi`): fingerprint of each sample after the [fingerprint QC](usage.md#fingerprint-qc) (Picard ExtractFingerprint, then bcftools annotate), VCF sample name `<sample>@<runid>`, one SNP per haplotype block. FORMAT fields `AD`, `DP` (Picard), `PL` (Picard; `0,0,0` at failed sites), `FT` (`PASS` or the failed filters `FpLowDepth`, `FpLowBaseQuality`, `FpNoLikelihoods`), `FPDP`, `FPAD`, `FPBQ` (depth, REF/ALT depth and mean base quality of the QC). The `##SAMPLE` header line holds the QC status, the values and the thresholds.
+  - `qc/<sample>_<runid>.fingerprint_qc_summary.tsv`: fingerprint QC of the sample, one row with the columns of `fingerprint_database_qc.tsv` (see below).
+  - `qc/<sample>_<runid>.fingerprint_qc_sites.tsv`: QC of each haplotype site: `#CHROM`, `POS`, `REF`, `ALT`, `FT`, `FPDP`, `FPAD`, `FPBQ`, `PL` (as written into the fingerprint).
   - `database/`
-    - `exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` (+ `.tbi`): updated fingerprint database, named with the start time of the pipeline run: the kept fingerprints of the given `--fingerprint_database` (all except those replaced by this run, see the warning in [usage](usage.md#updated-fingerprint-database)) and all fingerprints of this run; the sample order follows the input file names of bcftools merge. Use it as `--fingerprint_database` of the next run.
+    - `exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` (+ `.tbi`): updated fingerprint database, named with the start time of the pipeline run: the kept fingerprints of the given `--fingerprint_database` (all except those replaced by this run, see the warning in [usage](usage.md#updated-fingerprint-database)) and all fingerprints of this run; the sample order follows the input file names of bcftools merge. Each fingerprint keeps its site QC fields and has exactly one `##SAMPLE` header line with its QC status, values and thresholds (`ExomeqcFingerprintQC=NOT_RECORDED` for fingerprints added before the fingerprint QC existed). Use it as `--fingerprint_database` of the next run.
     - `previous_database_check.tsv` (only with `--fingerprint_database`): result of the check of the given database against the haplotype map (`metric`, `value`): `database_file`, `database_compression` (`plain`, `gzip` or `bgzip`), `database_samples`, `database_runs`, `database_sites`, `database_missing_genotypes`, `haplotype_map_snps`, `haplotype_map_blocks`, `replaced_fingerprints`, `kept_fingerprints`.
     - `previous_database_samples.tsv` (only with `--fingerprint_database`): every fingerprint of the given database: `fingerprint_id`, `sample`, `runid`, `action` (`keep`, or `replace` when this run has a fingerprint with the same `<sample>@<runid>`).
     - `fingerprint_database.crosscheck_metrics.txt` (only when the given database has kept fingerprints): Picard CrosscheckFingerprints of this run's fingerprints against the kept database fingerprints, before this run was added (all pairs). Not read by MultiQC's Picard module.
     - `fingerprint_database_fingerprints.tsv`: fingerprint of each sample of this run (see below).
+    - `fingerprint_database_qc.tsv`: fingerprint QC of each sample of this run (see below).
+    - `fingerprint_database_qc_mqc.tsv`: MultiQC section "Fingerprint QC".
     - `fingerprint_database_matches.tsv`: reported comparisons with fingerprints of other runs (see below).
-    - `fingerprint_database_summary.tsv`: counts (`metric`, `value`): `lod_threshold`, `haplotype_map_file`, `haplotype_map_snps`, `haplotype_map_blocks`, `run_samples`, `run_samples_suitable`, `run_samples_insufficient`, `run_samples_no_coverage`, `database_given` (`yes`/`no`), `database_file`, `database_compression`, `previous_database_samples`, `replaced_fingerprints`, `checked_database_samples`, `checked_database_runs`, `updated_database_file`, `database_samples` (in the updated database), `comparisons`, `unexpected_match`, `unexpected_mismatch`, `expected_match`, `inconclusive_same_sample`, `inconclusive_other_sample`, `expected_mismatch`, `reported_comparisons`.
+    - `fingerprint_database_summary.tsv`: counts (`metric`, `value`): `lod_threshold`, `haplotype_map_file`, `haplotype_map_snps`, `haplotype_map_blocks`, `run_samples`, `run_samples_suitable`, `run_samples_insufficient`, `run_samples_no_coverage`, `run_samples_qc_pass`, `run_samples_qc_fail`, `database_qc_pass`, `database_qc_fail`, `database_qc_not_recorded` (QC status of the fingerprints in the updated database), `database_given` (`yes`/`no`), `database_file`, `database_compression`, `previous_database_samples`, `replaced_fingerprints`, `checked_database_samples`, `checked_database_runs`, `updated_database_file`, `database_samples` (in the updated database), `comparisons`, `unexpected_match`, `unexpected_mismatch`, `expected_match`, `inconclusive_same_sample`, `inconclusive_other_sample`, `expected_mismatch`, `reported_comparisons`.
     - `fingerprint_database_overview_mqc.html`: MultiQC section "Fingerprint check: overview".
     - `fingerprint_database_matches_mqc.tsv` or, when nothing is reported, `fingerprint_database_matches_mqc.html`: MultiQC section "Crosscheck Fingerprints: Database matches".
 
@@ -45,6 +49,8 @@ Columns of `fingerprint_database_matches.tsv`:
 | `sample`, `runid`        | Sample of this run                                                                                  |
 | `database_sample`        | Sample ID of the database fingerprint                                                               |
 | `database_runid`         | Run of the database fingerprint                                                                     |
+| `fingerprint_qc`         | Fingerprint QC of the sample of this run (`PASS`, `FAIL`)                                           |
+| `database_fingerprint_qc` | Fingerprint QC of the database fingerprint (`PASS`, `FAIL`, `NOT_RECORDED`)                        |
 | `status`                 | `UNEXPECTED_MATCH`, `UNEXPECTED_MISMATCH`, `INCONCLUSIVE` (same sample ID only) or `EXPECTED_MATCH` |
 | `lod_score`              | LOD score: log10 likelihood ratio of same vs different individual                                   |
 | `lod_score_tumor_normal` | Tumor-aware LOD score with the sample of this run as tumor                                          |
@@ -64,6 +70,22 @@ Columns of `fingerprint_database_fingerprints.tsv` (one row per sample of this r
 | `mean_depth`                 | Mean `DP` over all blocks                                                                         |
 | `self_lod`                   | LOD of the sample's BAM compared with itself in `crosscheck.crosscheck_metrics.txt`               |
 | `status`                     | `SUITABLE` (self LOD ≥ T), `INSUFFICIENT` (self LOD < T) or `NO_COVERAGE` (no block with reads)   |
+| `fingerprint_qc`             | Fingerprint QC status (`PASS`, `FAIL`)                                                            |
+
+Columns of `fingerprint_database_qc.tsv` (one row per sample of this run; the same values are in the `##SAMPLE` header line of the fingerprint):
+
+| Column                                                                                  | Description                                                                                                                  |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `fingerprint_id`, `sample`, `runid`                                                     | `<sample>@<runid>`, sample and run                                                                                           |
+| `status`                                                                                | `PASS` or `FAIL`                                                                                                             |
+| `failed_criteria`                                                                       | `FractionPassingSites` and/or `Contamination` separated by `\|`, `.` if none                                                 |
+| `qc_date`, `exomeqc_version`                                                            | Start date of the run (`YYYY-MM-DD`) and pipeline version                                                                    |
+| `haplotype_sites`, `passing_sites`, `fraction_passing_sites`                            | Haplotype sites of the fingerprint, sites that pass, and their fraction                                                      |
+| `sites_low_depth`, `sites_low_base_quality`, `sites_no_likelihoods`                     | Sites with the filters `FpLowDepth`, `FpLowBaseQuality`, `FpNoLikelihoods` (a site can have several)                         |
+| `mean_site_depth`, `mean_site_base_quality`                                             | Mean `FPDP` over all sites; mean `FPBQ` over the sites with reads                                                            |
+| `contamination`, `contamination_sites`                                                  | Estimated contamination (`.` without passing sites) and the number of passing sites it is based on                           |
+| `min_base_quality`, `min_mapping_quality`, `min_site_depth`, `min_site_mean_base_quality` | Site thresholds used (`--fingerprint_qc_*`)                                                                                  |
+| `min_fraction_passing_sites`, `max_contamination`                                       | Sample thresholds used (`--fingerprint_qc_*`)                                                                                |
 
 ### FastQ Screen
 

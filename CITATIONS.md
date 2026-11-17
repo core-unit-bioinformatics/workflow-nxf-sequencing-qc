@@ -18,6 +18,14 @@
 
   > Vasimuddin Md, Misra S, Li H, Aluru S. Efficient Architecture-Aware Acceleration of BWA-MEM for Multicore Systems. 2019 IEEE International Parallel and Distributed Processing Symposium (IPDPS), 2019, pp. 314-324. doi: 10.1109/IPDPS.2019.00041.
 
+- [GNU Awk](https://www.gnu.org/software/gawk/)
+
+  > Free Software Foundation. GNU Awk. https://www.gnu.org/software/gawk/.
+
+- [HTSlib](https://pubmed.ncbi.nlm.nih.gov/33594436/)
+
+  > Bonfield JK, Marshall J, Danecek P, Li H, Ohan V, Whitwham A, Keane T, Davies RM. HTSlib: C library for reading/writing high-throughput sequencing data. Gigascience. 2021 Feb 16;10(2):giab007. doi: 10.1093/gigascience/giab007. PubMed PMID: 33594436.
+
 - [FastQ Screen](https://doi.org/10.12688/f1000research.15931.2)
 
   > Wingett SW, Andrews S. FastQ Screen: A tool for multi-genome mapping and quality control. F1000Research 2018, 7:1338. doi: 10.12688/f1000research.15931.2.
@@ -33,6 +41,10 @@
 - [SAMtools](https://pubmed.ncbi.nlm.nih.gov/33590861/)
 
   > Danecek P, Bonfield JK, Liddle J, Marshall J, Ohan V, Pollard MO, Whitwham A, Keane T, McCarthy SA, Davies RM, Li H. Twelve years of SAMtools and BCFtools. Gigascience. 2021 Feb 16;10(2):giab008. doi: 10.1093/gigascience/giab008. PubMed PMID: 33590861.
+
+- [VerifyBamID](https://pubmed.ncbi.nlm.nih.gov/23103226/) (contamination model of the fingerprint QC, re-implemented in `bin/fingerprint_qc.py`)
+
+  > Jun G, Flickinger M, Hetrick KN, Romm JM, Doheny KF, Abecasis GR, Boehnke M, Kang HM. Detecting and estimating contamination of human DNA samples in sequencing and array-based genotype data. Am J Hum Genet. 2012 Nov 2;91(5):839-48. doi: 10.1016/j.ajhg.2012.09.004. PubMed PMID: 23103226.
 
 - [MultiQC](https://pubmed.ncbi.nlm.nih.gov/27312411/)
 

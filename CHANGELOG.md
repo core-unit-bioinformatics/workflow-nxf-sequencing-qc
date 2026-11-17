@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Optional alignment of samples without BAM with bwa-mem2 (new parameters `--align_reads_for_fingerprint`, default `false`, and `--bwamem2_index`).
   - New parameters `--fasta_fai` and `--fasta_dict`; both are created from `--fasta` if not given.
   - Synthetic test data for the fingerprint check (`tests/fixtures/fingerprint/`): made-up sample IDs (`SYN001_3-N` ...) and run IDs, a random reference and simulated reads; the generator script `make_fingerprint_fixtures.py` also makes the module test inputs with Picard and bcftools and removes paths and dates from their headers. pytest unit tests for both scripts and nf-tests for the new modules and the subworkflow.
+  - Fingerprint QC of each sample before it enters the database (`FINGERPRINT_QC`, `bin/fingerprint_qc.py`): from a samtools mpileup at the haplotype map SNPs, each haplotype site must reach a depth and a mean base quality, counting bases with a minimum base and mapping quality and each read name once (new parameters `--fingerprint_qc_min_base_quality` 20, `--fingerprint_qc_min_mapping_quality` 20, `--fingerprint_qc_min_site_depth` 10, `--fingerprint_qc_min_site_mean_base_quality` 25). The contamination is estimated by maximum likelihood from the passing sites and the allele frequencies of the haplotype map (VerifyBamID FREEMIX model). A sample passes with enough passing sites and low contamination (new parameters `--fingerprint_qc_min_fraction_passing_sites` 0.5, `--fingerprint_qc_max_contamination` 0.03); failed samples are logged as `WARNING` and still added to the database, marked `FAIL`.
+  - Failed sites are masked in the fingerprint with flat genotype likelihoods (`PL=0,0,0`), so they do not contribute to any comparison. bcftools annotate writes the site QC into the fingerprint (`FORMAT/FT`, `FPDP`, `FPAD`, `FPBQ`) and a `##SAMPLE` header line with the QC status, the failed criteria, the observed values and the thresholds.
+  - The updated database has exactly one `##SAMPLE` QC line per fingerprint (`FINGERPRINT_DATABASE_HEADER`, `bin/fingerprint_database_header.py`, then bcftools reheader); fingerprints added before the QC existed are marked `ExomeqcFingerprintQC=NOT_RECORDED` and logged as `WARNING`.
+  - MultiQC section "Fingerprint QC" with status, failed criteria, values and thresholds of each sample; the QC status in the overview, and the QC status of both fingerprints in the database matches (`fingerprint_qc`, `database_fingerprint_qc`). New outputs `fingerprintcheck/qc/` and `fingerprintcheck/database/fingerprint_database_qc.tsv`.
 
 ### `Fixed`
 
@@ -51,11 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rows without `bam` now stop the pipeline with an `ERROR` when the fingerprint check is on and `--align_reads_for_fingerprint` is not set. Before, such rows were silently left out of the fingerprint check (the check for the `bam` column never failed).
 - Rows of the same `sample` that differ in `bam` or `runid` now stop the pipeline with an `ERROR`. Before, the values of the first row were used silently.
 - Results: the crosscheck of this run's BAMs (`fingerprintcheck/crosscheck.crosscheck_metrics.txt`, Picard 3.4.0, same arguments) has the same LOD scores and results as v1.1.1 for samples with a BAM (compared on the synthetic test data). As before, the order of the samples in the heatmap is set by Picard and can differ between runs. Samples aligned with `--align_reads_for_fingerprint` are added to it. The MultiQC report gains the new database section.
+- Fingerprint database: this run's fingerprints are crosschecked against the database and added to it after the fingerprint QC, with failed sites masked; the published fingerprints (`fingerprintcheck/fingerprints/`) are the fingerprints after QC.
 - MultiQC: `fingerprint_database.crosscheck_metrics.txt` is excluded from the Picard module (`sp.picard/crosscheckfingerprints.exclude_fn`), so database samples never enter the heatmap.
 
 ### `Dependencies`
 
 - New nf-core modules: `picard/extractfingerprint` (Picard 3.5.0), `bcftools/view` and `bcftools/merge` (bcftools 1.23.1), `bwamem2/index` and `bwamem2/mem` (bwa-mem2 2.3, whose binary reports version 2.2.1; samtools 1.22.1), `samtools/faidx` (samtools 1.24), `picard/createsequencedictionary` (Picard 3.5.0).
+- New nf-core modules for the fingerprint QC: `samtools/mpileup` (samtools 1.25), `gawk` (GNU Awk 5.3.1), `htslib/bgziptabix` (HTSlib 1.25), `bcftools/annotate` and `bcftools/reheader` (bcftools 1.25); new local modules `fingerprint_qc` and `fingerprint_database_header` (PyVCF3 container as below).
 - New local modules `check_fingerprint_database` and `fingerprint_database_report` (Python 3.12, PyVCF3 1.0.4, the maintained fork of PyVCF; biocontainer `pyvcf3:1.0.4--py312h0fa9677_0`).
 
 ## v0.1dev - [date]
