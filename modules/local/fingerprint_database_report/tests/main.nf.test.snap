@@ -54,7 +54,7 @@
                     {
                         "id": "fingerprint_database"
                     },
-                    "fingerprint_database_qc_mqc.tsv:md5,9c088b191f9ec8300cdc0078c3a674d6"
+                    "fingerprint_database_qc_mqc.tsv:md5,a3d247d342334016f6006cf6a89acead"
                 ]
             ],
             {
@@ -74,7 +74,7 @@
                 ]
             }
         ],
-        "timestamp": "2026-11-17T11:58:21.452441104",
+        "timestamp": "2026-11-17T13:30:14.476783724",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

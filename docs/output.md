@@ -83,9 +83,9 @@ Columns of `fingerprint_database_qc.tsv` (one row per sample of this run; the sa
 | `haplotype_sites`, `passing_sites`, `fraction_passing_sites`                            | Haplotype sites of the fingerprint, sites that pass, and their fraction                                                      |
 | `sites_low_depth`, `sites_low_base_quality`, `sites_no_likelihoods`                     | Sites with the filters `FpLowDepth`, `FpLowBaseQuality`, `FpNoLikelihoods` (a site can have several)                         |
 | `mean_site_depth`, `mean_site_base_quality`                                             | Mean `FPDP` over all sites; mean `FPBQ` over the sites with reads                                                            |
-| `contamination`, `contamination_sites`                                                  | Estimated contamination (`.` without passing sites) and the number of passing sites it is based on                           |
+| `contamination`, `contamination_sites`                                                  | Estimated contamination and the number of passing sites it is based on; `.` and `0` without passing sites or without `--fingerprint_qc_contamination_check` |
 | `min_base_quality`, `min_mapping_quality`, `min_site_depth`, `min_site_mean_base_quality` | Site thresholds used (`--fingerprint_qc_*`)                                                                                  |
-| `min_fraction_passing_sites`, `max_contamination`                                       | Sample thresholds used (`--fingerprint_qc_*`)                                                                                |
+| `min_fraction_passing_sites`, `max_contamination`                                       | Sample thresholds used (`--fingerprint_qc_*`); `max_contamination` is `.` when the contamination was not checked |
 
 ### FastQ Screen
 

@@ -551,3 +551,27 @@ def test_error_qc_summary_with_other_columns(scenario, capsys):
     run_expecting_error(
         scenario["args"], capsys, "expected the columns of fingerprint_qc.py"
     )
+
+
+def test_qc_without_contamination_check(scenario, capsys):
+    paths = write_qc(RUN, {RUN[1]: "FAIL"})
+    header, row = Path(paths[1]).read_text().splitlines()
+    values = dict(zip(header.split("\t"), row.split("\t")))
+    values.update(
+        failed_criteria="FractionPassingSites",
+        contamination=".",
+        contamination_sites="0",
+        max_contamination=".",
+    )
+    Path(paths[1]).write_text(
+        header + "\n" + "\t".join(values[c] for c in header.split("\t")) + "\n"
+    )
+    for path in paths[::2]:
+        text = Path(path).read_text().replace("\t0.0010\t5\t", "\t.\t0\t")
+        Path(path).write_text(text.rstrip("\n").rsplit("\t", 1)[0] + "\t.\n")
+    write_database(PREVIOUS + RUN, {RUN[1]: "FAIL"})
+    report.main(scenario["args"])
+    mqc = Path("fingerprint_database_qc_mqc.tsv").read_text()
+    assert "(contamination not checked)" in mqc
+    assert "not suited for tumour samples" not in mqc
+    assert "contamination not checked" in capsys.readouterr().err

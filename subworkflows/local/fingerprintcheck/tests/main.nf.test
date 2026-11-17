@@ -90,9 +90,9 @@ nextflow_workflow {
                 { assert qc_report.size() == 5 },
                 { assert qc_report[1..-1].every { line -> line.split('\t')[3] == 'PASS' } },
                 // one QC line per database fingerprint: run B with status, thresholds and values;
-                // run A was added before the QC existed
+                // run A was added before the QC existed; contamination not checked (default)
                 { assert qc_lines.size() == 6 },
-                { assert qc_lines.count { line -> line.contains('@20260201_LH00001_0002_BFIXTURE02,ExomeqcFingerprintQC=PASS,') && line.contains(',MinSiteDepth=10,') && line.contains(',MaxContamination=0.03>') } == 4 },
+                { assert qc_lines.count { line -> line.contains('@20260201_LH00001_0002_BFIXTURE02,ExomeqcFingerprintQC=PASS,') && line.contains(',MinSiteDepth=10,') && line.endsWith(',Contamination=.,ContaminationSites=0,MinBaseQuality=20,MinMappingQuality=20,MinSiteDepth=10,MinSiteMeanBaseQuality=25,MinFractionPassingSites=0.5,MaxContamination=.>') } == 4 },
                 { assert qc_lines.count { line -> line.endsWith('@20260101_LH00001_0001_AFIXTURE01,ExomeqcFingerprintQC=NOT_RECORDED>') } == 2 },
                 // the site QC is in the fingerprints
                 { assert workflow.out.fingerprints.every { row -> path(row[1]).linesGzip.findAll { line -> !line.startsWith('#') }.every { line -> line.split('\t')[8] == 'AD:DP:PL:FT:FPDP:FPAD:FPBQ' } } },

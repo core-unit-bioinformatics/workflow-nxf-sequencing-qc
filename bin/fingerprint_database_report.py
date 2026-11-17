@@ -761,10 +761,16 @@ def qc_description(row):
         f"and the mean base quality of its reads is &ge; {row['min_site_mean_base_quality']}. "
         "Failed sites are masked (flat genotype likelihoods) and do not count in fingerprint "
         "comparisons. A sample passes if the fraction of passing sites is &ge; "
-        f"{row['min_fraction_passing_sites']} and its estimated contamination (maximum "
-        "likelihood from the passing sites and the allele frequencies of the haplotype map) is "
-        f"&le; {row['max_contamination']}. Status, thresholds and values are stored with each "
-        "fingerprint in the database (##SAMPLE header line)."
+        f"{row['min_fraction_passing_sites']}"
+        + (
+            " (contamination not checked)"
+            if row["max_contamination"] == "."
+            else " and its estimated contamination (maximum likelihood from the passing sites "
+            "and the allele frequencies of the haplotype map; not suited for tumour samples) is "
+            f"&le; {row['max_contamination']}"
+        )
+        + ". Status, thresholds and values are stored with each fingerprint in the database "
+        "(##SAMPLE header line)."
     )
 
 
@@ -830,7 +836,8 @@ def write_qc_mqc_table(path, qc_summaries):
         "        format: '{:,.1f}'",
         "    contamination:",
         "        title: 'Contamination'",
-        f"        description: {yaml_quote('Estimated fraction of reads from another person; maximum ' + rows[0]['max_contamination'])}",
+        f"        description: {yaml_quote('Estimated fraction of reads from another person; maximum ' + rows[0]['max_contamination'] if rows[0]['max_contamination'] != '.' else 'Contamination not checked (--fingerprint_qc_contamination_check false)')}",
+        f"        hidden: {'true' if rows[0]['max_contamination'] == '.' else 'false'}",
         "        format: '{:,.4f}'",
         "        min: 0",
         "    contamination_sites:",
@@ -1087,7 +1094,11 @@ def main(argv=None):
                 f"{fingerprint_id}: fingerprint QC FAIL ({row['failed_criteria']}): "
                 f"{row['passing_sites']} of {row['haplotype_sites']} haplotype sites pass "
                 f"(minimum fraction {row['min_fraction_passing_sites']}), contamination "
-                f"{row['contamination']} (maximum {row['max_contamination']})"
+                + (
+                    "not checked"
+                    if row["max_contamination"] == "."
+                    else f"{row['contamination']} (maximum {row['max_contamination']})"
+                )
             )
     if replaced:
         warning(

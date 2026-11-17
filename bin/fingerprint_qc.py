@@ -26,6 +26,7 @@ FpNoLikelihoods in FORMAT/FT, and their PL is set to 0,0,0: a flat
 likelihood carries no information, so Picard CrosscheckFingerprints gives
 the same LOD scores as without the site (a missing PL makes Picard fail).
 
+The contamination check is optional: it runs only with --max-contamination.
 Contamination is estimated from the high-quality bases (as for FPDP) at the
 passing sites by maximum likelihood, with the model of VerifyBamID's FREEMIX
 (Jun et al. 2012, doi:10.1016/j.ajhg.2012.09.004): a fraction c of the reads
@@ -33,13 +34,19 @@ comes from another person of the same population; the genotypes of the sample
 and of the contaminant are unknown and follow Hardy-Weinberg proportions of
 the map's allele frequency; a base of quality q is wrong with probability
 10^(-q/10), and a wrong base shows a given other allele with a third of that.
-c is searched in [0, 0.5]. Caveat: allelic imbalance in tumour samples
-(loss of heterozygosity, copy number changes) raises the estimate.
+c is searched in [0, 0.5]. The model assumes a diploid, copy-neutral
+sample: copy-number-driven allelic imbalance in tumours looks like
+contamination, and VerifyBamID was shown to overestimate the contamination
+of most tumour samples (Bergmann et al. 2016, doi:10.1093/bioinformatics/
+btw389). Tumour-capable methods need a matched normal or a copy number
+segmentation. Without --max-contamination, no estimate is made and the
+contamination values are '.' (not checked).
 
 The sample passes the QC if
 
     passing sites / all sites >= --min-fraction-passing-sites
-    contamination <= --max-contamination   (no estimate without passing sites)
+    contamination <= --max-contamination   (only if given; no estimate
+                                            without passing sites)
 
 No existing tool covers this: Picard ExtractFingerprint has fixed base and
 mapping quality thresholds and reports neither depth per quality nor
@@ -161,7 +168,11 @@ def parse_args(argv):
     parser.add_argument("--min-site-depth", type=int, required=True)
     parser.add_argument("--min-site-mean-base-quality", type=float, required=True)
     parser.add_argument("--min-fraction-passing-sites", type=float, required=True)
-    parser.add_argument("--max-contamination", type=float, required=True)
+    parser.add_argument(
+        "--max-contamination",
+        type=float,
+        help="check the contamination with this maximum; without it, no contamination check",
+    )
     parser.add_argument("--qc-date", required=True, help="date of the QC, YYYY-MM-DD")
     parser.add_argument("--exomeqc-version", required=True)
     parser.add_argument("--prefix", required=True)
@@ -173,8 +184,16 @@ def parse_args(argv):
         ("--min-site-depth", args.min_site_depth, 1, None),
         ("--min-site-mean-base-quality", args.min_site_mean_base_quality, 0, 93),
         ("--min-fraction-passing-sites", args.min_fraction_passing_sites, 0, 1),
-        ("--max-contamination", args.max_contamination, 0, MAX_CONTAMINATION_SEARCHED),
     ]
+    if args.max_contamination is not None:
+        checks.append(
+            (
+                "--max-contamination",
+                args.max_contamination,
+                0,
+                MAX_CONTAMINATION_SEARCHED,
+            )
+        )
     for name, value, low, high in checks:
         if value < low or (high is not None and value > high):
             fail(
@@ -458,8 +477,11 @@ def summarise(sites_qc, contamination, contamination_sites, args):
     failed = []
     if fraction < args.min_fraction_passing_sites:
         failed.append(CRITERION_SITES)
-    # without an estimate the contamination criterion is not met
-    if contamination is None or contamination > args.max_contamination:
+    # without an estimate the contamination criterion is not met; without
+    # --max-contamination the contamination is not checked
+    if args.max_contamination is not None and (
+        contamination is None or contamination > args.max_contamination
+    ):
         failed.append(CRITERION_CONTAMINATION)
     qualities = [
         site["mean_quality"] for site in sites_qc if site["mean_quality"] is not None
@@ -492,7 +514,9 @@ def summarise(sites_qc, contamination, contamination_sites, args):
         "min_site_depth": str(args.min_site_depth),
         "min_site_mean_base_quality": f"{args.min_site_mean_base_quality:g}",
         "min_fraction_passing_sites": f"{args.min_fraction_passing_sites:g}",
-        "max_contamination": f"{args.max_contamination:g}",
+        "max_contamination": (
+            MISSING if args.max_contamination is None else f"{args.max_contamination:g}"
+        ),
     }
 
 
@@ -527,8 +551,12 @@ def main(argv=None):
         for qc, site in zip(sites_qc, sites)
         if not qc["filters"]
     ]
-    contamination = estimate_contamination(passing)
-    summary = summarise(sites_qc, contamination, len(passing), args)
+    # the contamination check is optional (not suited for tumour samples)
+    contamination, contamination_sites = None, 0
+    if args.max_contamination is not None:
+        contamination = estimate_contamination(passing)
+        contamination_sites = len(passing)
+    summary = summarise(sites_qc, contamination, contamination_sites, args)
 
     # site table for bcftools annotate: failed sites get flat likelihoods
     with open(f"{args.prefix}_sites.tsv", "w", newline="") as handle:
@@ -564,8 +592,12 @@ def main(argv=None):
     info(
         f"{args.fingerprint_id}: fingerprint QC {summary['status']}"
         f" (failed: {summary['failed_criteria']}); {summary['passing_sites']} of "
-        f"{summary['haplotype_sites']} sites pass, contamination {summary['contamination']}"
-        f" from {len(passing)} sites"
+        f"{summary['haplotype_sites']} sites pass, contamination "
+        + (
+            f"{summary['contamination']} from {contamination_sites} sites"
+            if args.max_contamination is not None
+            else "not checked"
+        )
     )
 
 

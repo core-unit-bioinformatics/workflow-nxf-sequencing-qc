@@ -291,3 +291,32 @@ def test_reference_mismatch_fails(scenario, capsys):
 )
 def test_invalid_options_fail(scenario, capsys, option, value):
     run_expecting_error(args_for(**{option: value}), capsys, option)
+
+
+def without_contamination_check():
+    """Arguments without --max-contamination: the contamination is not checked."""
+    args = args_for()
+    index = args.index("--max-contamination")
+    return args[:index] + args[index + 2 :]
+
+
+def test_contamination_not_checked_without_max_contamination(scenario, capsys):
+    # 20% ALT reads at homozygous sites: fails with the check (see above), passes without
+    lines = [
+        pileup_line(pos, major, reads(32, 8, minor, major))
+        for pos, _n, major, minor, _a in SNPS
+    ]
+    write_pileup("sample.mpileup", lines)
+    qc.main(without_contamination_check())
+    summary = read_rows("out_summary.tsv")[0]
+    assert summary["status"] == "PASS"
+    assert summary["failed_criteria"] == "."
+    assert (
+        summary["contamination"],
+        summary["contamination_sites"],
+        summary["max_contamination"],
+    ) == (".", "0", ".")
+    sample_line = Path("out_header.txt").read_text().splitlines()[-1]
+    assert ",Contamination=.," in sample_line
+    assert sample_line.endswith(",MaxContamination=.>")
+    assert "contamination not checked" in capsys.readouterr().err

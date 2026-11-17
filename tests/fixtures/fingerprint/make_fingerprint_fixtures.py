@@ -449,7 +449,8 @@ def make_report_fixtures(outdir):
     )
 
 
-# arguments of fingerprint_qc.py as set by conf/modules.config with the defaults
+# arguments of fingerprint_qc.py as set by conf/modules.config with the defaults,
+# but with --fingerprint_qc_contamination_check (the report test covers its values)
 QC_THRESHOLDS = [
     "--min-base-quality", "20",
     "--min-mapping-quality", "20",

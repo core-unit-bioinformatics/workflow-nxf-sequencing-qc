@@ -138,13 +138,19 @@
                     "description": "Fingerprint QC: minimum fraction of haplotype sites that pass for the sample to pass.",
                     "help_text": "Set it according to the haplotype map: with a map of SNPs outside the targets of the exome kit, few sites reach the depth. Stored as MinFractionPassingSites."
                 },
+                "fingerprint_qc_contamination_check": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Fingerprint QC: estimate the contamination of each sample and fail samples above --fingerprint_qc_max_contamination.",
+                    "help_text": "Off by default. The estimate uses the model of VerifyBamID FREEMIX, which assumes a diploid, copy-neutral sample; it was shown to overestimate the contamination of most tumour samples, because copy-number-driven allelic imbalance looks like contamination (Bergmann et al. 2016, Conpair). Use it only for germline (normal) samples. When off, the contamination is recorded as not checked (Contamination=., MaxContamination=.)."
+                },
                 "fingerprint_qc_max_contamination": {
                     "type": "number",
                     "default": 0.03,
                     "minimum": 0,
                     "maximum": 0.5,
-                    "description": "Fingerprint QC: maximum estimated contamination (fraction of reads from another person) for the sample to pass.",
-                    "help_text": "Estimated by maximum likelihood from the high-quality bases of the passing sites and the allele frequencies (MAF) of the haplotype map (model of VerifyBamID FREEMIX). Allelic imbalance in tumour samples (loss of heterozygosity, copy number changes) raises the estimate. Stored as MaxContamination."
+                    "description": "Fingerprint QC: maximum estimated contamination (fraction of reads from another person) for the sample to pass; only used with --fingerprint_qc_contamination_check.",
+                    "help_text": "Estimated by maximum likelihood from the high-quality bases of the passing sites and the allele frequencies (MAF) of the haplotype map (model of VerifyBamID FREEMIX). Not suited for tumour samples. Stored as MaxContamination."
                 }
             }
         },
