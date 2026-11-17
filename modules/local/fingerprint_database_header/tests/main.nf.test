@@ -1,0 +1,87 @@
+nextflow_process {
+
+    name "Test Process FINGERPRINT_DATABASE_HEADER"
+    script "../main.nf"
+    process "FINGERPRINT_DATABASE_HEADER"
+
+    tag "modules"
+    tag "modules_local"
+    tag "fingerprint_database_header"
+
+    // Synthetic fixtures, see tests/fixtures/fingerprint/make_fingerprint_fixtures.py:
+    // report/database.vcf.gz is run A (no QC lines) plus SYN001_3-N, SYN002_1-T and
+    // SYN003_1-T of run B, whose QC header lines are in report/qc/.
+
+    test("database of run A and B - one QC line per fingerprint") {
+
+        when {
+            process {
+                """
+                def report = "${projectDir}/tests/fixtures/fingerprint/report"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                input[0] = [ [ id:'exomeqc_fingerprint_database' ], file("\${report}/database.vcf.gz", checkIfExists: true) ]
+                input[1] = [ 'SYN001_3-N', 'SYN002_1-T', 'SYN003_1-T' ].collect { sample -> file("\${report}/qc/\${sample}_\${run_b}.fingerprint_qc_header.txt", checkIfExists: true) }
+                """
+            }
+        }
+
+        then {
+            def sample_lines = path(process.out.header[0][1]).readLines().findAll { line -> line.startsWith('##SAMPLE=') }
+            assertAll(
+                { assert process.success },
+                { assert sample_lines.size() == 5 },
+                { assert sample_lines.count { line -> line.contains(',ExomeqcFingerprintQC=PASS,') } == 3 },
+                { assert sample_lines.count { line -> line.endsWith(',ExomeqcFingerprintQC=NOT_RECORDED>') } == 2 },
+                { assert snapshot(
+                    process.out.header,
+                    process.out.findAll { key, val -> key.startsWith('versions') }
+                ).match() }
+            )
+        }
+    }
+
+    test("error - QC line of a fingerprint that is not in the database") {
+
+        when {
+            process {
+                """
+                def report = "${projectDir}/tests/fixtures/fingerprint/report"
+                def run_b = '20260201_LH00001_0002_BFIXTURE02'
+                // the database of run A holds none of the run B fingerprints
+                input[0] = [ [ id:'exomeqc_fingerprint_database' ], file("\${report}/previous_database.vcf.gz", checkIfExists: true) ]
+                input[1] = [ file("\${report}/qc/SYN001_3-N_\${run_b}.fingerprint_qc_header.txt", checkIfExists: true) ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.failed },
+                { assert process.exitStatus == 1 },
+                { assert (process.stdout + process.stderr).join('\n').contains('is not in the merged database') }
+            )
+        }
+    }
+
+    test("database of run A and B - stub") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                def report = "${projectDir}/tests/fixtures/fingerprint/report"
+                input[0] = [ [ id:'exomeqc_fingerprint_database' ], file("\${report}/database.vcf.gz", checkIfExists: true) ]
+                input[1] = [ file("\${report}/qc/SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_header.txt", checkIfExists: true) ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out).match() }
+            )
+        }
+    }
+}

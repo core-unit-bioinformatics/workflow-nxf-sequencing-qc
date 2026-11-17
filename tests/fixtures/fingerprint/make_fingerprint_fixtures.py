@@ -36,12 +36,23 @@ and multiqc/, in the same way as the pipeline makes them:
 Paths, dates and command lines are removed from their headers, so that the
 fixtures do not depend on the machine they were made on.
 
+With --qc-fixtures, only the fingerprint QC inputs of the report test are
+made from the existing fixtures (no new simulation), with samtools, bcftools
+and the scripts fingerprint_qc.py and fingerprint_database_header.py of bin/,
+in the same way as the pipeline makes them (default thresholds):
+    report/qc/<sample>_<run>.mpileup.gz        samtools mpileup of each run B BAM
+    report/qc/<sample>_<run>.fingerprint_qc_{summary.tsv,sites.tsv,header.txt}
+                                               QC outputs of each run B BAM
+    report/database_qc.vcf.gz                  report/database.vcf.gz with one
+                                               ##SAMPLE QC line per fingerprint
+
 Requires pysam (only needed to regenerate the fixtures, not to run the
 pipeline). The output is deterministic for a given --seed, apart from the
 compression of the gzipped files.
 
 Usage:
     make_fingerprint_fixtures.py --outdir tests/fixtures/fingerprint [--report-fixtures]
+    make_fingerprint_fixtures.py --outdir tests/fixtures/fingerprint --qc-fixtures
 """
 
 import argparse
@@ -171,9 +182,10 @@ def simulate_sample(outdir, run, sample, haplotypes, write_bam, rng):
 
     # write R1 (forward strand) and R2 (reverse strand) FASTQ files; mtime=0
     # keeps the gzip header free of the creation time
-    with gzip.GzipFile(
-        outdir / f"{prefix}_R1.fastq.gz", "wb", mtime=0
-    ) as r1, gzip.GzipFile(outdir / f"{prefix}_R2.fastq.gz", "wb", mtime=0) as r2:
+    with (
+        gzip.GzipFile(outdir / f"{prefix}_R1.fastq.gz", "wb", mtime=0) as r1,
+        gzip.GzipFile(outdir / f"{prefix}_R2.fastq.gz", "wb", mtime=0) as r2,
+    ):
         for name, _start, forward, _mate_start, reverse in pairs:
             r1.write(
                 f"@{name}/1\n{forward}\n+\n{BASE_QUALITY * READ_LENGTH}\n".encode()
@@ -437,6 +449,104 @@ def make_report_fixtures(outdir):
     )
 
 
+# arguments of fingerprint_qc.py as set by conf/modules.config with the defaults
+QC_THRESHOLDS = [
+    "--min-base-quality", "20",
+    "--min-mapping-quality", "20",
+    "--min-site-depth", "10",
+    "--min-site-mean-base-quality", "25",
+    "--min-fraction-passing-sites", "0.5",
+    "--max-contamination", "0.03",
+]  # fmt: skip
+# samtools mpileup arguments as set by conf/modules.config
+MPILEUP_ARGS = [
+    "--no-BAQ", "--min-BQ", "0", "--min-MQ", "0", "--output-MQ", "--output-QNAME",
+    "--ignore-overlaps-removal", "--max-depth", "0", "--ff", "UNMAP,SECONDARY,QCFAIL",
+]  # fmt: skip
+
+
+def make_qc_fixtures(outdir):
+    """Make the fingerprint QC inputs of the report test from the existing fixtures."""
+    for tool in ("samtools", "bcftools"):
+        if shutil.which(tool) is None:
+            sys.exit(f"ERROR: --qc-fixtures needs '{tool}' on PATH")
+    bin_dir = Path(__file__).resolve().parents[3] / "bin"
+    outdir = outdir.resolve()
+    report = outdir / "report"
+    qc = report / "qc"
+    qc.mkdir(exist_ok=True)
+    qc_date = f"{FIXED_DATE[:4]}-{FIXED_DATE[4:6]}-{FIXED_DATE[6:]}"
+    # BED of all SNPs of the haplotype map, as GAWK_FINGERPRINT_SITES writes it
+    bed = qc / "haplotype_map_sites.bed"
+    lines = (outdir / "haplotype_map.txt").read_text().splitlines()
+    bed.write_text(
+        "".join(
+            f"{f[0]}\t{int(f[1]) - 1}\t{f[1]}\n"
+            for f in (line.split("\t") for line in lines)
+            if f[0] and not f[0].startswith(("@", "#"))
+        )
+    )
+    headers = []
+    for run_id, sample, _individual, write_bam in SAMPLES:
+        if run_id != RUN_B or not write_bam:
+            continue
+        prefix = f"{sample}_{run_id}"
+        with open(qc / f"{prefix}.mpileup", "w") as handle:
+            result = subprocess.run(
+                ["samtools", "mpileup", "--fasta-ref", str(outdir / "reference.fasta")]
+                + MPILEUP_ARGS
+                + ["-l", str(bed), str(outdir / f"{prefix}.bam")],
+                stdout=handle,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+        if result.returncode != 0:
+            sys.exit(f"ERROR: samtools mpileup failed: {result.stderr}")
+        run(
+            [sys.executable, str(bin_dir / "fingerprint_qc.py")]
+            + ["--fingerprint", str(report / f"{prefix}.fingerprint.vcf.gz")]
+            + ["--pileup", f"{prefix}.mpileup"]
+            + ["--haplotype-map", str(outdir / "haplotype_map.txt")]
+            + ["--fingerprint-id", f"{sample}@{run_id}"]
+            + QC_THRESHOLDS
+            + ["--qc-date", qc_date, "--exomeqc-version", "1.0.0"]
+            + ["--prefix", f"{prefix}.fingerprint_qc"],
+            qc,
+        )
+        headers.append(f"{prefix}.fingerprint_qc_header.txt")
+    # the database of the report test with one QC line per fingerprint
+    run(
+        [sys.executable, str(bin_dir / "fingerprint_database_header.py")]
+        + ["--database", str(report / "database.vcf.gz"), "--run-qc"]
+        + headers
+        + ["--prefix", "database_qc"],
+        qc,
+    )
+    run(
+        ["bcftools", "reheader", "--header", "qc/database_qc_header.txt"]
+        + ["--output", "database_qc.vcf.gz", "database.vcf.gz"],
+        report,
+    )
+    pysam.tabix_index(str(report / "database_qc.vcf.gz"), preset="vcf", force=True)
+    # keep the pileups (gzip, as SAMTOOLS_MPILEUP writes them) and the QC
+    # outputs of each sample: inputs of the module tests
+    for path in list(qc.iterdir()):
+        if path.name.endswith(".mpileup"):
+            # mtime 0: the same content gives the same file
+            with (
+                open(path, "rb") as plain,
+                open(f"{path}.gz", "wb") as handle,
+                gzip.GzipFile(fileobj=handle, mode="wb", mtime=0) as compressed,
+            ):
+                compressed.write(plain.read())
+            path.unlink()
+        elif path.name.startswith("database_qc") or not path.name.endswith(
+            ("_summary.tsv", "_sites.tsv", "_qc_header.txt", ".mpileup.gz")
+        ):
+            path.unlink()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -448,7 +558,16 @@ def main():
         action="store_true",
         help="also make the module test inputs (needs picard and bcftools on PATH)",
     )
+    parser.add_argument(
+        "--qc-fixtures",
+        action="store_true",
+        help="only make the fingerprint QC inputs of the report test from the existing "
+        "fixtures (needs samtools and bcftools on PATH)",
+    )
     args = parser.parse_args()
+    if args.qc_fixtures:
+        make_qc_fixtures(args.outdir)
+        return
 
     args.outdir.mkdir(parents=True, exist_ok=True)
     rng = random.Random(args.seed)

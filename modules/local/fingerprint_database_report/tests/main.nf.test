@@ -43,10 +43,11 @@ nextflow_process {
                             [ 'SYN001_3-N', 'SYN002_1-T', 'SYN003_1-T' ].collect { sample -> file("\${report}/\${sample}_\${run_b}.fingerprint.vcf.gz", checkIfExists: true) },
                             file("\${fixtures}/haplotype_map.txt", checkIfExists: true),
                             file("\${report}/crosscheck.crosscheck_metrics.txt", checkIfExists: true),
-                            file("\${report}/database.vcf.gz", checkIfExists: true),
+                            file("\${report}/database_qc.vcf.gz", checkIfExists: true),
                             check,
                             samples,
-                            file("\${report}/fingerprint_database.crosscheck_metrics.txt", checkIfExists: true)
+                            file("\${report}/fingerprint_database.crosscheck_metrics.txt", checkIfExists: true),
+                            [ 'SYN001_3-N', 'SYN002_1-T', 'SYN003_1-T' ].collect { sample -> file("\${report}/qc/\${sample}_\${run_b}.fingerprint_qc_summary.tsv", checkIfExists: true) }
                         ]
                     }
                 """
@@ -54,11 +55,19 @@ nextflow_process {
         }
 
         then {
+            def match_lines = path(process.out.matches[0][1]).readLines()
+            def match_header = match_lines[0].split('\t') as List
+            def matches = match_lines[1..-1].collect { line -> [ match_header, line.split('\t') as List ].transpose().collectEntries() }
             assertAll(
                 { assert process.success },
                 // the three classes of the fixture design are reported, unexpected results first
-                { assert path(process.out.matches[0][1]).readLines().collect { line -> line.split('\t')[4] } == ['status', 'UNEXPECTED_MATCH', 'UNEXPECTED_MISMATCH', 'EXPECTED_MATCH'] },
-                { assert path(process.out.fingerprints[0][1]).readLines()[1..-1].every { line -> line.endsWith('\tSUITABLE') } },
+                { assert matches.collect { row -> row.status } == ['UNEXPECTED_MATCH', 'UNEXPECTED_MISMATCH', 'EXPECTED_MATCH'] },
+                // this run passed the QC; run A was added to the database before the QC existed
+                { assert matches.every { row -> row.fingerprint_qc == 'PASS' && row.database_fingerprint_qc == 'NOT_RECORDED' } },
+                { assert path(process.out.fingerprints[0][1]).readLines()[1..-1].every { line -> line.endsWith('\tSUITABLE\tPASS') } },
+                { assert path(process.out.qc[0][1]).readLines().size() == 4 },
+                { assert file(process.out.qc_multiqc[0][1]).name == 'fingerprint_database_qc_mqc.tsv' },
+                { assert path(process.out.overview[0][1]).text.contains('<strong>Fingerprint QC:</strong> 3 PASS, 0 FAIL') },
                 { assert file(process.out.multiqc[0][1]).name == 'fingerprint_database_matches_mqc.tsv' },
                 { assert path(process.out.overview[0][1]).text.contains('compared with 2 fingerprints of 1 other runs') },
                 { assert snapshot(
@@ -67,6 +76,8 @@ nextflow_process {
                     process.out.summary,
                     process.out.overview,
                     process.out.multiqc,
+                    process.out.qc,
+                    process.out.qc_multiqc,
                     process.out.findAll { key, val -> key.startsWith('versions') }
                 ).match() }
             )
@@ -88,10 +99,11 @@ nextflow_process {
                     [ 'SYN001_3-N', 'SYN002_1-T', 'SYN003_1-T' ].collect { sample -> file("\${report}/\${sample}_\${run_b}.fingerprint.vcf.gz", checkIfExists: true) },
                     file("\${fixtures}/haplotype_map.txt", checkIfExists: true),
                     file("\${report}/crosscheck.crosscheck_metrics.txt", checkIfExists: true),
-                    file("\${report}/database.vcf.gz", checkIfExists: true),
+                    file("\${report}/database_qc.vcf.gz", checkIfExists: true),
                     [],
                     [],
-                    []
+                    [],
+                    [ 'SYN001_3-N', 'SYN002_1-T', 'SYN003_1-T' ].collect { sample -> file("\${report}/qc/\${sample}_\${run_b}.fingerprint_qc_summary.tsv", checkIfExists: true) }
                 ]
                 """
             }
@@ -121,7 +133,8 @@ nextflow_process {
                     [ file("\${report}/SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz", checkIfExists: true) ],
                     file("\${fixtures}/haplotype_map.txt", checkIfExists: true),
                     file("\${report}/crosscheck.crosscheck_metrics.txt", checkIfExists: true),
-                    file("\${report}/database.vcf.gz", checkIfExists: true),
+                    file("\${report}/database_qc.vcf.gz", checkIfExists: true),
+                    [],
                     [],
                     [],
                     []
