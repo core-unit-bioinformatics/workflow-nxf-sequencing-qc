@@ -11,8 +11,10 @@ process DRAGEN_CNV_QC {
 
     output:
     path("*.csv") , emit: metrics
-    path("*.json"), emit: json
-    path("*.png") , emit: plots
+    // the JSON needs *.cnv.purity.coverage.models.tsv, the plots *.tn.tsv.gz or
+    // *.tumor.baf.bedgraph.gz; both inputs are optional in the DRAGEN output
+    path("*.json"), emit: json , optional: true
+    path("*.png") , emit: plots, optional: true
     path "versions.yml"
     tuple val("${task.process}"), val('karyoploter'), eval(''), topic: versions, emit: versions_karyoploter
 
@@ -44,12 +46,12 @@ process DRAGEN_CNV_QC {
     """
     echo $args
     
-    touch cnv-metrics.csv
-    touch purcov_maxmodel_lineplot.json
-    touch pur-cov-allmodel-stub.png
-    touch pur-cov-maxmodel-stub.png
-    touch karyoplot-stub-tn.png
-    touch karyoplot-stub-tumor.baf.png
+    # same file names as the script writes with the default ext.args
+    # (per-sample purity/coverage PNGs are off: --plot-purcov-maxmodel=false)
+    touch ${prefix}cnv-metrics.csv
+    touch ${prefix}purcov_maxmodel_lineplot.json
+    touch ${prefix}karyoplot-stub-tn_mqc.png
+    touch ${prefix}karyoplot-stub-tumor.baf_mqc.png
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
