@@ -23,8 +23,13 @@ The source is chosen per VCF from its header and logged. A counted variant
 allele without a value in the chosen field(s) stops with an error; there is
 no fallback to another field. Each ALT allele of a multi-allelic record counts
 as one variant (as after splitting with `bcftools norm -m-any`); ALT `.`, `*`,
-`<NON_REF>` and `<*>` are no variant alleles and are skipped and counted. By
-default only records with FILTER `PASS` are counted. Bins are [start, end),
+`<NON_REF>` and `<*>` are no variant alleles and are skipped and counted. If the FORMAT has GT, only
+the ALT alleles in the sample's genotype are counted; the others (hom-ref,
+no-call `./.`, e.g. the normal column of a tumor/normal VCF or samples of a
+joint-called VCF) are skipped and counted. By default only records with
+FILTER `PASS` or `.` are counted: `.` means that no filters were applied
+(e.g. FreeBayes, unfiltered GATK), these records are counted, logged and
+written to the summary. Bins are [start, end),
 the last bin includes VAF 1.0. Bin edges use decimal arithmetic, so a VAF of
 exactly 0.15 falls into [0.15, 0.20) and not into [0.10, 0.15) by
 floating-point error.
@@ -148,10 +153,27 @@ def parse_decimal(text, where, field):
     return value
 
 
-def allele_vafs(source, fmt, sample_values, n_alts, where):
-    """Return one Decimal VAF per ALT allele of one sample, from FORMAT_AF or FORMAT_AD."""
-    # map the FORMAT keys to this sample's values; trailing fields may be dropped
-    values = dict(zip(fmt, sample_values.split(":")))
+def genotype_alts(gt, n_alts, where):
+    """Return the set of ALT allele numbers (1..n_alts) in a GT value; empty for hom-ref or no-call."""
+    alts = set()
+    for allele in re.split(r"[/|]", gt):
+        if allele in (".", ""):
+            continue
+        if not allele.isdigit() or int(allele) > n_alts:
+            fail(
+                f"{where}: GT '{gt}' has allele '{allele}', expected 0..{n_alts} or '.'"
+            )
+        if int(allele) > 0:
+            alts.add(int(allele))
+    return alts
+
+
+def allele_vafs(source, values, n_alts, alleles, where):
+    """Return a Decimal VAF for each ALT allele number in alleles (1-based), from FORMAT_AF or FORMAT_AD.
+
+    values maps the FORMAT keys to this sample's values. Only the requested
+    alleles need a value; e.g. the `*` allele may be `.`.
+    """
     if source == "FORMAT_AF":
         # FORMAT/AF: one fraction per ALT allele
         parts = values.get("AF", ".").split(",")
@@ -159,7 +181,7 @@ def allele_vafs(source, fmt, sample_values, n_alts, where):
             fail(
                 f"{where}: FORMAT/AF has {len(parts)} value(s) for {n_alts} ALT allele(s)"
             )
-        vafs = [parse_decimal(p, where, "AF") for p in parts]
+        vafs = [parse_decimal(parts[a - 1], where, "AF") for a in alleles]
         hint = "FORMAT/AF"
     else:
         # FORMAT/AD: REF count first, then one count per ALT allele; FORMAT/DP: depth
@@ -168,12 +190,12 @@ def allele_vafs(source, fmt, sample_values, n_alts, where):
             fail(
                 f"{where}: FORMAT/AD has {len(parts)} value(s) for 1 REF + {n_alts} ALT allele(s)"
             )
-        ad = [parse_decimal(p, where, "AD") for p in parts]
+        ad = [parse_decimal(parts[a], where, "AD") for a in alleles]
         depth = parse_decimal(values.get("DP", "."), where, "DP")
         # a counted variant needs reads; DP 0 gives no VAF
         if depth <= 0:
             fail(f"{where}: FORMAT/DP is {values.get('DP')}, no VAF can be computed")
-        vafs = [count / depth for count in ad[1:]]
+        vafs = [count / depth for count in ad]
         hint = f"FORMAT/AD {values.get('AD')} / FORMAT/DP {values.get('DP')}"
     # a fraction outside [0, 1] means inconsistent fields (e.g. AD[alt] > DP)
     for vaf in vafs:
@@ -189,6 +211,8 @@ def new_summary():
         "records_filtered": 0,
         "alleles_counted": 0,
         "alleles_non_variant": 0,
+        "alleles_not_in_genotype": 0,
+        "records_filter_missing": 0,
     }
 
 
@@ -244,7 +268,9 @@ def count_vcf(
                     )
                 alts = fields[4].split(",")
                 fmt = fields[8].split(":")
-                passed = fields[6] == "PASS"
+                # FILTER '.' means no filters were applied: counted like PASS, but counted separately
+                filter_missing = fields[6] == "."
+                passed = fields[6] == "PASS" or filter_missing
                 for col, column in selected:
                     counts, summary = result[column]
                     summary["records_read"] += 1
@@ -252,17 +278,34 @@ def count_vcf(
                     if not passed and not include_filtered:
                         summary["records_filtered"] += 1
                         continue
-                    # skip records without any variant allele before reading the VAF
-                    variant = [alt not in NON_VARIANT_ALTS for alt in alts]
-                    summary["alleles_non_variant"] += variant.count(False)
-                    if not any(variant):
+                    summary["records_filter_missing"] += filter_missing
+                    # ALT allele numbers (1-based) that are real variant alleles
+                    variant = [
+                        a
+                        for a, alt in enumerate(alts, start=1)
+                        if alt not in NON_VARIANT_ALTS
+                    ]
+                    summary["alleles_non_variant"] += len(alts) - len(variant)
+                    if not variant:
                         continue
                     where = f"{path}: line {line_no} ({fields[0]}:{fields[1]}), column {column}"
-                    vafs = allele_vafs(source, fmt, fields[9 + col], len(alts), where)
-                    for is_variant, vaf in zip(variant, vafs):
-                        if is_variant:
-                            counts[bin_index(vaf, width, n_bins)] += 1
-                            summary["alleles_counted"] += 1
+                    # map the FORMAT keys to this sample's values; trailing fields may be dropped
+                    values = dict(zip(fmt, fields[9 + col].split(":")))
+                    # with GT, count only the ALT alleles the sample carries
+                    if "GT" in fmt:
+                        carried = genotype_alts(values.get("GT", "."), len(alts), where)
+                        counted = [a for a in variant if a in carried]
+                        summary["alleles_not_in_genotype"] += len(variant) - len(
+                            counted
+                        )
+                    else:
+                        counted = variant
+                    if not counted:
+                        continue
+                    vafs = allele_vafs(source, values, len(alts), counted, where)
+                    for vaf in vafs:
+                        counts[bin_index(vaf, width, n_bins)] += 1
+                        summary["alleles_counted"] += 1
     except (OSError, EOFError, UnicodeDecodeError, gzip.BadGzipFile) as err:
         fail(f"{path}: cannot read VCF ({err})")
     if columns is None:
@@ -297,7 +340,7 @@ def multiqc_json(histograms, bins, width, include_filtered):
     filter_text = (
         "all records (PASS and filtered)"
         if include_filtered
-        else "records with FILTER PASS"
+        else "records with FILTER PASS or '.' (no filters applied)"
     )
     sources = sorted({h["source"] for h in histograms.values()})
     description = (
@@ -356,7 +399,7 @@ def main(argv=None):
     parser.add_argument(
         "--include-filtered",
         action="store_true",
-        help="also count records whose FILTER is not PASS",
+        help="also count records whose FILTER is not PASS or '.'",
     )
     parser.add_argument(
         "--prefix",
@@ -382,7 +425,7 @@ def main(argv=None):
     log(
         "INFO",
         f"{len(args.input)} VCF(s); VAF source {args.allele_fraction}; bin width {fmt_edge(width)} "
-        f"({len(bins)} bins); counting {'all' if args.include_filtered else 'PASS'} records",
+        f"({len(bins)} bins); counting {'all' if args.include_filtered else "PASS and '.'"} records",
     )
 
     histograms = {}
@@ -420,8 +463,15 @@ def main(argv=None):
                 "INFO",
                 f"{path.name}: {name} (column {column}): {summary['records_read']} records read, "
                 f"{summary['records_filtered']} skipped as not PASS, {summary['alleles_counted']} alleles counted, "
-                f"{summary['alleles_non_variant']} skipped as non-variant ALT",
+                f"{summary['alleles_non_variant']} skipped as non-variant ALT, "
+                f"{summary['alleles_not_in_genotype']} skipped as not in the sample's GT",
             )
+            if summary["records_filter_missing"]:
+                log(
+                    "WARNING",
+                    f"{path.name}: {name}: {summary['records_filter_missing']} record(s) with FILTER '.' "
+                    "(no filters applied) counted like PASS",
+                )
             if summary["alleles_counted"] == 0:
                 log(
                     "WARNING",

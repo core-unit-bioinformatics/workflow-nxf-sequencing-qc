@@ -28,7 +28,7 @@ output:
   tsv:
     - "${task.ext.prefix ?: 'vaf_histogram'}.tsv":
         type: file
-        description: Variants per sample and VAF bin (sample, vcf, bin_start, bin_end, variants)
+        description: Variants per sample and VAF bin (sample, vcf_sample, vcf, bin_start, bin_end, variants)
         pattern: "*.tsv"
   summary:
     - "${task.ext.prefix ?: 'vaf_histogram'}_summary.tsv":
