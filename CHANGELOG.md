@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `chr2_29699000_29741000`) and a `runid` column in `samplesheet.csv` (made up, one per assay: `SEQC2_PANEL`,
   `SEQC2_EXOME`, `SEQC2_GENOME`). `-profile test_seqc2` and `tests/default.nf.test` pass it as `--fasta`,
   `--fasta_fai` and `--fasta_dict`, so the profile runs with the fingerprint check (on by default).
+- Per-sample input checks with a fix hint: a sample without FASTQ stops the pipeline when FastQ Screen is on, a
+  CRAM in the `bam` column stops it when the fingerprint check is on (Picard and samtools mpileup get no reference
+  index for CRAM; convert to BAM).
+- README, `docs/usage.md` and `docs/output.md` describe the features, the supported assay types (short-read gene
+  panels, exomes and genomes) and the restrictions: short reads only, CNV QC for DRAGEN CNV caller output only,
+  fingerprinting from BAM only (CRAM rejected), and for gene panels a haplotype map with SNPs inside the targets.
+  CITATIONS.md and the MultiQC methods text cite karyoploteR (CNV QC) and DRAGEN (input data).
 
 ### `Fixed`
 
@@ -61,9 +68,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `bin/analyze_cnv_metrics.R` was committed without the executable bit (mode 100644), so `DRAGEN_CNV_QC` failed with `Permission denied` (exit 126) when run from a fresh clone. It is now executable (100755). No change in results.
 - CNV QC Metrics table in MultiQC lost samples: `cnv-metrics.csv` started with `QC_STATUS`, which MultiQC used as row ID, so all PASS (or FAIL) samples collapsed into one row. `sample` is now the first column.
 - CNV QC Metrics table showed most metrics (e.g. `EstimatedTumorPurity`, `PMAD`) as plain text without bars: `cnv-metrics.csv` quoted them because they were stored as text, and MultiQC does not parse quoted values as numbers. Numeric values are now written unquoted.
+- FastQ Screen always ran with `--paired`, also for single-end samples. `--paired` is now passed only for
+  paired-end samples (`fastq_2` given), so single-end data are screened correctly. Paired-end results are unchanged.
 
 ### `Changed`
 
+- **Breaking:** the pipeline is renamed from `exomeqc` to `core-unit-bioinformatics/workflow-nxf-sequencing-qc`
+  and covers short-read gene panels, exomes and genomes with the same samplesheet and parameters (Nextflow workflow
+  `SEQUENCINGQC`, `workflows/sequencingqc.nf`, `subworkflows/local/utils_nfcore_sequencingqc_pipeline`).
+  - The software versions file is now `pipeline_info/sequencingqc_software_mqc_versions.yml`.
+  - MultiQC custom-content IDs `exomeqc_cnv_metrics` / `exomeqc_purcov_maxmodel` are renamed to
+    `dragen_cnv_qc_metrics` / `dragen_cnv_qc_purcov_maxmodel`. Update custom MultiQC configs that refer to the old IDs.
+  - The MultiQC report title is now "Sequencing QC"; the CNV sections are labelled "DRAGEN CNV QC Metrics" and
+    "DRAGEN CNV: Purity/Coverage Model".
+  - The CNV QC parameters are grouped as "DRAGEN CNV QC options" (`dragen_cnvqc_options`) in
+    `nextflow_schema.json` and documented as DRAGEN-specific.
 - Samplesheet: new column `runid`, required with `--enable_fingerprintcheck`. With the fingerprint check, `sample` and `runid` may only contain `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`.
 - `--fasta` (the reference the BAMs are aligned to) is now required with `--enable_fingerprintcheck`, because Picard ExtractFingerprint needs it. It must be uncompressed.
 - Rows without `bam` now stop the pipeline with an `ERROR` when the fingerprint check is on and `--align_reads_for_fingerprint` is not set. Before, such rows were silently left out of the fingerprint check (the check for the `bam` column never failed).

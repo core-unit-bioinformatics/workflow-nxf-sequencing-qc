@@ -1,86 +1,253 @@
 # core-unit-bioinformatics/workflow-nxf-sequencing-qc: Usage
 
-> _Documentation of pipeline parameters is generated automatically from the pipeline schema and can no longer be found in markdown files._
+> _All parameters with descriptions are also listed by `nextflow run core-unit-bioinformatics/workflow-nxf-sequencing-qc --help --show_hidden` (generated from `nextflow_schema.json`)._
 
 ## Introduction
 
-<!-- TODO nf-core: Add documentation about anything specific to running your pipeline. For general topics, please point to (and add to) the main nf-core website. -->
+The pipeline runs QC on **short-read** data of any assay type, such as gene panels, exomes
+and genomes. You don't need to declare the assay type, and the same parameters work for all
+of them. Only these things depend on the data:
+
+| Step                                 | Depends on                                                                                                                                    |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| FastQ Screen                         | Single-/paired-end status, detected per sample from the samplesheet (`fastq_2` empty = single-end).                                           |
+| Fingerprint check and fingerprint QC | The haplotype map having SNPs inside the sequenced regions (relevant for small panels, see [assay-type notes](#assay-type-notes)); BAM input. |
+| DRAGEN CNV QC, report summary        | **DRAGEN** output; other CNV callers are not supported.                                                                                       |
+| VAF histogram                        | A small-variant VCF with FORMAT/AF or FORMAT/AD + DP (any caller).                                                                            |
+
+Long-read data (ONT, PacBio) is not supported.
 
 ## Samplesheet input
 
-You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown in the examples below.
+Use `--input` to pass a comma-separated samplesheet with a header row. Each row is one sample of one sequencing run.
 
 ```bash
 --input '[path to samplesheet file]'
 ```
 
-### Multiple runs of the same sample
-
-The `sample` identifiers have to be the same when you have re-sequenced the same sample more than once e.g. to increase sequencing depth. The pipeline will concatenate the raw reads before performing any downstream analysis. Below is an example for the same sample sequenced across 3 lanes:
-
 ```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L003_R1_001.fastq.gz,AEG588A1_S1_L003_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L004_R1_001.fastq.gz,AEG588A1_S1_L004_R2_001.fastq.gz
+sample,fastq_1,fastq_2,bam,runid,vcf
+PANEL_01,PANEL_01_R1.fastq.gz,PANEL_01_R2.fastq.gz,PANEL_01.bam,20260101_LH00001_0001_AXXXXXXXX,PANEL_01.vcf.gz
+EXOME_01,EXOME_01_R1.fastq.gz,EXOME_01_R2.fastq.gz,EXOME_01.bam,20260101_LH00001_0001_AXXXXXXXX,
+WGS_01,WGS_01_R1.fastq.gz,WGS_01_R2.fastq.gz,WGS_01.bam,20260101_LH00001_0001_AXXXXXXXX,
+SE_01,SE_01_R1.fastq.gz,,SE_01.bam,20260101_LH00001_0001_AXXXXXXXX,
 ```
 
-### Full samplesheet
+| Column    | Required                                                                                        | Description                                                                                                                                                                                                                                                           |
+| --------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`  | always                                                                                          | Sample name without spaces. With the fingerprint check only `A-Z`, `a-z`, `0-9`, `.`, `_`, `-` (it becomes part of VCF sample and file names).                                                                                                                        |
+| `fastq_1` | with `--enable_fastqscreen` (default), or for rows aligned with `--align_reads_for_fingerprint` | Gzipped FASTQ, read 1 (`.fastq.gz` / `.fq.gz`).                                                                                                                                                                                                                       |
+| `fastq_2` | for paired-end data                                                                             | Gzipped FASTQ, read 2. Leave empty for single-end data. Do not mix single- and paired-end rows of one sample.                                                                                                                                                         |
+| `bam`     | with `--enable_fingerprintcheck` (default), unless `--align_reads_for_fingerprint` is set       | BAM of the sample, aligned to `--fasta`. The pipeline creates the index. **CRAM is not supported**: the pipeline stops with an error. Rows without `bam` are aligned from `fastq_1`/`fastq_2` with bwa-mem2 if `--align_reads_for_fingerprint` is set.                |
+| `runid`   | with `--enable_fingerprintcheck` (default)                                                      | ID of the sequencing run the sample comes from, e.g. `20260101_LH00001_0001_AFIXTURE01`. Together with `sample` it identifies a fingerprint as `<sample>@<runid>`, because the same sample can be sequenced in several runs. Only `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`. |
+| `vcf`     | no                                                                                              | Small-variant VCF (`.vcf` or `.vcf.gz`, any caller) of the sample, used for the [VAF histogram](#vaf-histogram).                                                                                                                                                      |
 
-The pipeline will auto-detect whether a sample is single- or paired-end using the information provided in the samplesheet. The samplesheet can have as many columns as you desire, however, there is a strict requirement for the first 3 columns to match those defined in the table below.
-
-A final samplesheet file consisting of both single- and paired-end data may look something like the one below. This is for 6 samples, where `TREATMENT_REP3` has been sequenced twice.
-
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP2,AEG588A2_S2_L002_R1_001.fastq.gz,AEG588A2_S2_L002_R2_001.fastq.gz
-CONTROL_REP3,AEG588A3_S3_L002_R1_001.fastq.gz,AEG588A3_S3_L002_R2_001.fastq.gz
-TREATMENT_REP1,AEG588A4_S4_L003_R1_001.fastq.gz,
-TREATMENT_REP2,AEG588A5_S5_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L004_R1_001.fastq.gz,
-```
-
-| Column    | Description                                                                                                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`  | Custom sample name. This entry will be identical for multiple sequencing libraries/runs from the same sample. Spaces in sample names are automatically converted to underscores (`_`). |
-| `fastq_1` | Full path to FastQ file for Illumina short reads 1. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
-| `fastq_2` | Full path to FastQ file for Illumina short reads 2. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
-
-Columns for the fingerprint check (`--enable_fingerprintcheck`, on by default):
-
-| Column  | Description                                                                                                                                                                                                                                                                                      |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `bam`   | Full path to the BAM/CRAM file of the sample, aligned to `--fasta`. Required for every row unless `--align_reads_for_fingerprint` is set; then rows without `bam` are aligned from `fastq_1`/`fastq_2` with bwa-mem2.                                                                            |
-| `runid` | RUNID of the sequencing run the sample comes from, e.g. `20260101_LH00001_0001_AFIXTURE01`. Required for every row. Together with `sample` it identifies a fingerprint as `<sample>@<runid>`, because the same sample can be sequenced in several runs. Only `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`. |
-
-With the fingerprint check, `sample` may only contain `A-Z`, `a-z`, `0-9`, `.`, `_` and `-` (it becomes part of VCF sample and file names). Each sample may appear in only one `bam`/`runid` combination per samplesheet: rows of the same `sample` are merged and must agree on `bam` and `runid`.
-
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2,bam,runid
-SYN001_1-T,SYN001_1-T_R1.fq.gz,SYN001_1-T_R2.fq.gz,SYN001_1-T_tumor.bam,20260101_LH00001_0001_AFIXTURE01
-SYN001_3-N,SYN001_3-N_R1.fq.gz,SYN001_3-N_R2.fq.gz,SYN001_3-N.bam,20260101_LH00001_0001_AFIXTURE01
-```
-
-Optional column for the VAF histogram:
-
-- `vcf`: Full path to a small-variant VCF (`.vcf` or `.vcf.gz`, any caller) of the sample, used for the [VAF histogram](#vaf-histogram). All rows of a sample must give the same `vcf` or none.
+When a step is on and a row lacks the column that step needs, the pipeline stops with an
+error. The error names the sample and tells you how to fix it.
 
 An [example samplesheet](../assets/samplesheet.csv) has been provided with the pipeline.
 
-## Running the pipeline
+### Multiple rows of the same sample
 
-The typical command for running the pipeline is as follows:
+Rows with the same `sample` are merged into one sample, e.g. for a sample sequenced on several
+lanes: FastQ Screen gets all FASTQ files of that sample. The rows must be all single-end or all
+paired-end and must give the same `bam`, `runid` and `vcf` (or leave them empty in all rows);
+otherwise the pipeline stops with an error. To fingerprint the same sample from several
+sequencing runs, run each sequencing run separately and pass the fingerprint database on (see
+[Fingerprint check](#fingerprint-check-and-fingerprint-database)).
 
-```bash
-nextflow run core-unit-bioinformatics/workflow-nxf-sequencing-qc --input ./samplesheet.csv --outdir ./results --genome GRCh37 -profile docker
+```csv title="samplesheet.csv"
+sample,fastq_1,fastq_2,bam,runid
+WGS_01,WGS_01_L001_R1.fastq.gz,WGS_01_L001_R2.fastq.gz,WGS_01.bam,20260101_LH00001_0001_AXXXXXXXX
+WGS_01,WGS_01_L002_R1.fastq.gz,WGS_01_L002_R2.fastq.gz,WGS_01.bam,20260101_LH00001_0001_AXXXXXXXX
 ```
 
-To enable FastQ Screen and include its metrics in MultiQC, add:
+### Additional MultiQC inputs
+
+`--multiqc_inputs` takes a CSV with the header `paths`, listing existing directories for
+MultiQC to scan. These can be DRAGEN, Picard, mosdepth, bcl-convert or any other
+[MultiQC-supported](https://multiqc.info/modules/) output, from any assay type:
+
+```csv title="multiqc_inputs.csv"
+paths
+/data/run01/dragen
+/data/run01/mosdepth
+```
+
+The DRAGEN directory given by `--dragen_dirs` is added to MultiQC as well, even with
+`enable_cnvqc: false`. MultiQC then shows DRAGEN mapping, coverage (WGS and target-region) and
+variant-calling metrics for any assay type.
+
+## Parameters
+
+All pipeline parameters, grouped as in `nextflow_schema.json` (hidden parameters: `--help --show_hidden`). Defaults are the values in `nextflow.config`; "unset" means the parameter is not used unless given. Booleans are set in a `-params-file` (see [Running the pipeline](#running-the-pipeline)).
+
+### Input/output options
+
+Details: [Samplesheet input](#samplesheet-input), [MultiQC report name](#multiqc-report-name).
+
+| Parameter               | Default | Description                                                                                                                                                                                     |
+| ----------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--input`               | unset   | Path to comma-separated samplesheet with one row per sample (and sequencing run). Columns: sample, fastq_1, fastq_2, bam, runid, vcf. Required.                                                 |
+| `--outdir`              | unset   | The output directory where the results will be saved. You have to use absolute paths to storage on Cloud infrastructure. Required.                                                              |
+| `--multiqc_inputs`      | unset   | Path to a CSV with header `paths` listing additional directories (e.g. DRAGEN, Picard, mosdepth output) for MultiQC to scan.                                                                    |
+| `--email`               | unset   | Email address for completion summary.                                                                                                                                                           |
+| `--multiqc_title`       | unset   | MultiQC report title. Printed as page header, used for filename if not otherwise specified.                                                                                                     |
+| `--multiqc_report_name` | unset   | File name of the MultiQC report, without `.html`, e.g. the run ID. The report is written to `multiqc/<name>.html`, its data to `multiqc/<name>_data/` and its plots to `multiqc/<name>_plots/`. |
+
+### Fingerprint check options
+
+Details: [Fingerprint check and fingerprint database](#fingerprint-check-and-fingerprint-database), [Fingerprint QC](#fingerprint-qc).
+
+| Parameter                                     | Default | Description                                                                                                                                                          |
+| --------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--enable_fingerprintcheck`                   | `true`  | Enable the fingerprint check (Picard CrosscheckFingerprints and the fingerprint database).                                                                           |
+| `--fingerprint_haplotype_map`                 | unset   | Path to the Picard haplotype map (text format) used for the fingerprints.                                                                                            |
+| `--fingerprint_allow_duplicate_reads`         | `true`  | Allow duplicate reads in CrosscheckFingerprints of this run's BAMs (heatmap).                                                                                        |
+| `--align_reads_for_fingerprint`               | `false` | Align the FASTQ files of samples without BAM with bwa-mem2 for the fingerprint check.                                                                                |
+| `--fingerprint_database`                      | unset   | Fingerprint database of previous exomeqc runs (`fingerprintcheck/database/exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz`).                                   |
+| `--fingerprint_database_lod_threshold`        | `5`     | LOD threshold T for comparisons with the fingerprint database: match if LOD >= T, mismatch if LOD <= -T, inconclusive in between.                                    |
+| `--fingerprint_qc_min_base_quality`           | `20`    | Fingerprint QC: minimum base quality of a base to count for the depth (FPDP), the allele depths and the contamination estimate.                                      |
+| `--fingerprint_qc_min_mapping_quality`        | `20`    | Fingerprint QC: minimum mapping quality of a read to count at a haplotype site.                                                                                      |
+| `--fingerprint_qc_min_site_depth`             | `10`    | Fingerprint QC: minimum depth (FPDP) of a haplotype site to pass.                                                                                                    |
+| `--fingerprint_qc_min_site_mean_base_quality` | `25`    | Fingerprint QC: minimum mean base quality (FPBQ) of a haplotype site to pass.                                                                                        |
+| `--fingerprint_qc_min_fraction_passing_sites` | `0.5`   | Fingerprint QC: minimum fraction of haplotype sites that pass for the sample to pass.                                                                                |
+| `--fingerprint_qc_contamination_check`        | `false` | Fingerprint QC: estimate the contamination of each sample and fail samples above --fingerprint_qc_max_contamination.                                                 |
+| `--fingerprint_qc_max_contamination`          | `0.03`  | Fingerprint QC: maximum estimated contamination (fraction of reads from another person) for the sample to pass; only used with --fingerprint_qc_contamination_check. |
+
+### FastQ Screen options
+
+Details: [FastQ Screen](#fastq-screen).
+
+| Parameter                | Default   | Description                                                                          |
+| ------------------------ | --------- | ------------------------------------------------------------------------------------ |
+| `--enable_fastqscreen`   | `true`    | Enable FastQ Screen analysis for input FASTQ files.                                  |
+| `--fastqscreen_database` | unset     | Path to the FastQ Screen database: a directory or a .tar.gz archive of it.           |
+| `--fastqscreen_subset`   | `1000000` | Number of reads (read pairs for paired-end data) sampled per sample by FastQ Screen. |
+
+### VAF histogram options
+
+Details: [VAF histogram](#vaf-histogram).
+
+| Parameter                          | Default | Description                                                                                                                                                            |
+| ---------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--enable_vaf_histogram`           | `false` | Add a histogram of the variant allele fractions per sample to the MultiQC report.                                                                                      |
+| `--vaf_histogram_bin_width`        | `0.05`  | Width of the VAF bins, a fraction in (0, 1], e.g. 0.05 for 5 % bins.                                                                                                   |
+| `--vaf_histogram_allele_fraction`  | `auto`  | Source of the VAF: `FORMAT_AF` (FORMAT/AF), `FORMAT_AD` (FORMAT/AD[alt] / FORMAT/DP) or `auto` (FORMAT_AF if the VCF header declares FORMAT/AF, else FORMAT_AD).       |
+| `--vaf_histogram_sample_regex`     | unset   | Count only VCF columns whose sample name matches this regular expression (Python syntax), e.g. `-T$` for the tumor column of a tumor/normal VCF. Default: all columns. |
+| `--vaf_histogram_include_filtered` | `false` | Also count variants whose FILTER is not PASS or `.`. Default: only PASS variants and variants with FILTER `.` (no filters applied).                                    |
+
+### Report summary options
+
+Details: [Report summary](#report-summary).
+
+| Parameter            | Default | Description                                                                                                      |
+| -------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--enable_summary`   | `true`  | Add the summary section to the top of the MultiQC report.                                                        |
+| `--summary_tmb_high` | unset   | Highlight TMB (mut/Mb) at or above this value. Unset: no highlighting.                                           |
+| `--summary_msi_high` | unset   | Highlight MSI (% unstable sites, DRAGEN PercentageUnstableSites) at or above this value. Unset: no highlighting. |
+| `--summary_hrd_high` | unset   | Highlight HRD sum (LOH + TAI + LST) at or above this value. Unset: no highlighting.                              |
+
+### DRAGEN CNV QC options
+
+Details: [DRAGEN CNV QC](#dragen-cnv-qc).
+
+| Parameter                         | Default | Description                                                                                                                                             |
+| --------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--enable_cnvqc`                  | `true`  | Summarise DRAGEN somatic CNV caller output (QC table, purity model plot, karyotype plots).                                                              |
+| `--dragen_dirs`                   | unset   | Directory with DRAGEN output. Used by CNV QC and added to the MultiQC inputs.                                                                           |
+| `--pmad_max`                      | unset   | CNV QC: fail a sample if PMAD (cnv_metrics.csv) is above this value. Not checked if unset.                                                              |
+| `--coverage_mad_max`              | unset   | CNV QC: fail a sample if Coverage MAD (cnv_metrics.csv) is above this value. Not checked if unset.                                                      |
+| `--outlier_baf_fraction_max`      | unset   | CNV QC: fail a sample if OutlierBafFraction (cnv_metrics.csv) is above this value. Not checked if unset.                                                |
+| `--diploid_coverage_min`          | unset   | CNV QC: fail a sample if DiploidCoverage (CNV VCF header) is below this value. Not checked if unset.                                                    |
+| `--purity_min`                    | unset   | CNV QC: fail a sample if EstimatedTumorPurity (CNV VCF header) is below this value. A fraction in [0, 1], e.g. 0.4 for 40 %. Not checked if unset.      |
+| `--purity_max`                    | unset   | CNV QC: fail a sample if EstimatedTumorPurity (CNV VCF header) is above this value. A fraction in [0, 1]. Not checked if unset.                         |
+| `--ploidy_min`                    | unset   | CNV QC: fail a sample if OverallPloidy (CNV VCF header) is below this value. Not checked if unset.                                                      |
+| `--ploidy_max`                    | unset   | CNV QC: fail a sample if OverallPloidy (CNV VCF header) is above this value. Not checked if unset.                                                      |
+| `--post_norm_sigma_max`           | unset   | CNV QC: fail a sample if Post-Normalization Bin Count Sigma (cnv_metrics.csv) is above this value. Not checked if unset.                                |
+| `--num_segments_max`              | unset   | CNV QC: fail a sample if the Number of segments (cnv_metrics.csv) is above this value. Not checked if unset.                                            |
+| `--filtered_records_relative_max` | unset   | CNV QC: fail a sample if the percentage of filtered records (cnv_metrics.csv) is above this value. Not checked if unset.                                |
+| `--homozygosity_index_max`        | unset   | CNV QC: fail a sample if HomozygosityIndex (CNV VCF header) is above this value. Not checked if unset.                                                  |
+| `--total_excluded_bp_max`         | unset   | CNV QC: fail a sample if the total length of the excluded intervals (*.cnv.excluded_intervals.bed.gz, in bp) is above this value. Not checked if unset. |
+
+### Reference genome options
+
+| Parameter         | Default | Description                                                                                                        |
+| ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `--genome`        | unset   | Name of iGenomes reference.                                                                                        |
+| `--fasta`         | unset   | Path to the reference FASTA the BAMs are aligned to.                                                               |
+| `--fasta_fai`     | unset   | Path to the samtools index (.fai) of `--fasta`. Created if not given.                                              |
+| `--fasta_dict`    | unset   | Path to the sequence dictionary (.dict) of `--fasta`. Created if not given.                                        |
+| `--bwamem2_index` | unset   | Path to the bwa-mem2 index directory of `--fasta` (used with `--align_reads_for_fingerprint`). Built if not given. |
+
+### Generic options
+
+| Parameter                       | Default | Description                                                                                         |
+| ------------------------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `--multiqc_config`              | unset   | Custom config file to supply to MultiQC.                                                            |
+| `--multiqc_logo`                | unset   | Custom logo file to supply to MultiQC. File name must also be set in the MultiQC config file        |
+| `--multiqc_methods_description` | unset   | Custom MultiQC yaml file containing HTML including a methods description.                           |
+| `--help`                        | unset   | Display the help message.                                                                           |
+| `--help_full`                   | unset   | Display the full detailed help message.                                                             |
+| `--show_hidden`                 | unset   | Display hidden parameters in the help message (only works when --help or --help_full are provided). |
+
+
+## Running the pipeline
+
+Put the parameters in a params file and run:
 
 ```bash
---enable_fastqscreen --fastqscreen_database /path/to/FastQ_Screen_Genomes
+nextflow run core-unit-bioinformatics/workflow-nxf-sequencing-qc -profile docker -params-file params.yaml
+```
+
+```yaml title="params.yaml"
+input: samplesheet.csv
+outdir: results
+fastqscreen_database: /refs/FastQ_Screen_Genomes
+fingerprint_haplotype_map: /refs/hg38_haplotype_map.txt
+fasta: /refs/GRCh38.fasta
+fingerprint_database: /data/run00/results/fingerprintcheck/database/exomeqc_fingerprint_database_20260101-120000.vcf.gz
+dragen_dirs: /data/run01/dragen
+multiqc_report_name: 20260101_LH00001_0001_AXXXXXXXX
+```
+
+This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.
+
+To switch steps off, set them in the params file:
+
+```yaml
+enable_cnvqc: false            # non-DRAGEN data
+enable_fingerprintcheck: false # no BAMs available
+enable_fastqscreen: false      # no FASTQs available
+```
+
+> [!IMPORTANT]
+> Set booleans in the params file. On the command line, `--enable_cnvqc false` is passed as
+> a string and fails parameter validation.
+
+> [!WARNING]
+> Do not use `-c <file>` to specify parameters as this will result in errors. Custom config files specified with `-c` must only be used for [tuning process resource specifications](https://nf-co.re/docs/running/run-pipelines#configuring-pipelines), other infrastructural tweaks (such as output directories), or module arguments (args).
+
+You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-co.re/launch).
+
+Note that the pipeline will create the following files in your working directory:
+
+```bash
+work                # Directory containing the nextflow working files
+<OUTDIR>            # Finished results in specified location (defined with --outdir)
+.nextflow_log       # Log file from Nextflow
+# Other nextflow hidden files, eg. history of pipeline runs and old logs.
+```
+
+### FastQ Screen
+
+FastQ Screen (`--enable_fastqscreen`, on by default) works for panels, exomes and genomes, with
+single- or paired-end reads: `--paired` is only passed to FastQ Screen for paired-end samples.
+Every sample needs `fastq_1` (and `fastq_2` for paired-end data); a sample without FASTQ stops
+the pipeline with an error. It needs the database:
+
+```bash
+--fastqscreen_database /path/to/FastQ_Screen_Genomes
 ```
 
 The `--fastqscreen_database` directory must contain `fastq_screen.conf` and the referenced genome index folders. It can also be given as a `.tar.gz` of that directory (local path or URL); the pipeline unpacks it into a directory named like the archive without `.tar.gz`. `DATABASE` paths in `fastq_screen.conf` must be absolute or relative to the parent of the database directory (`<database_dir_name>/<genome>/<index_prefix>`).
@@ -186,6 +353,21 @@ Without `--bwamem2_index`, the index is built from `--fasta`; for a human genome
 
 Tested inputs: Picard 3.4.0 (CrosscheckFingerprints) and 3.5.0 (ExtractFingerprint), bcftools 1.23.1 (view, merge) and 1.25 (annotate, reheader), samtools 1.25 (mpileup), HTSlib 1.25, GNU Awk 5.3.1, bwa-mem2 2.3 (conda package; the binary reports 2.2.1), PyVCF3 1.0.4 on the synthetic test data in `tests/fixtures/fingerprint/` (see `make_fingerprint_fixtures.py`), with the database given as bgzip with index and as plain VCF without index (nf-test), and as plain VCF, gzip and bgzip (pytest). The real haplotype map (e.g. Broad's `Homo_sapiens_assembly38.haplotype_database.txt`) was not tested here. The contamination estimate of the fingerprint QC was tested on simulated pileups (pytest: 0 to 20 % contamination recovered within 0.01 at 400 sites) and on the fixture BAM of `SYN001_3-N` mixed with 5 % and 11 % reads of another synthetic person (true fractions 0.048 and 0.099; estimates 0.047 and 0.096 at 100 sites); it was not validated on real exomes.
 
+#### Assay-type notes
+
+- **Genome / exome:** a genome-wide haplotype map (for example the GATK hg38 map) works. For exomes,
+  only SNPs inside the targets of the exome kit get reads; set `--fingerprint_qc_min_fraction_passing_sites`
+  accordingly.
+- **Gene panel:** only SNPs inside the panel targets add information. With a genome-wide map, small
+  panels give few or no informative SNPs: the comparisons come out `INCONCLUSIVE`, the fingerprints
+  `NO_COVERAGE` or `INSUFFICIENT` and the fingerprint QC fails. Use a haplotype map built from common
+  SNPs inside the panel targets.
+- **BAM only:** CRAM input is not supported for fingerprinting (Picard and samtools mpileup get no
+  reference index here); the pipeline stops with an error. Convert CRAM to BAM, or set
+  `enable_fingerprintcheck: false`.
+
+### MultiQC report name
+
 To name the MultiQC report after the run, add e.g.:
 
 ```bash
@@ -215,41 +397,6 @@ Input requirements (searched recursively in all `--dragen_dirs`, case = file pre
 
 A case found twice across `--dragen_dirs`, or a malformed file, stops the pipeline with an error naming the file. A case with only some of the files is shown with `n/a` and listed under "Incomplete cases". Tested with synthetic files modelled on DRAGEN output (`tests/fixtures/summary/`); not yet with a real DRAGEN run.
 
-This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.
-
-Note that the pipeline will create the following files in your working directory:
-
-```bash
-work                # Directory containing the nextflow working files
-<OUTDIR>            # Finished results in specified location (defined with --outdir)
-.nextflow_log       # Log file from Nextflow
-# Other nextflow hidden files, eg. history of pipeline runs and old logs.
-```
-
-If you wish to repeatedly use the same parameters for multiple runs, rather than specifying each flag in the command, you can specify these in a params file.
-
-Pipeline settings can be provided in a `yaml` or `json` file via `-params-file <file>`.
-
-> [!WARNING]
-> Do not use `-c <file>` to specify parameters as this will result in errors. Custom config files specified with `-c` must only be used for [tuning process resource specifications](https://nf-co.re/docs/running/run-pipelines#configuring-pipelines), other infrastructural tweaks (such as output directories), or module arguments (args).
-
-The above pipeline run specified with a params file in yaml format:
-
-```bash
-nextflow run core-unit-bioinformatics/workflow-nxf-sequencing-qc -profile docker -params-file params.yaml
-```
-
-with:
-
-```yaml title="params.yaml"
-input: './samplesheet.csv'
-outdir: './results/'
-genome: 'GRCh37'
-<...>
-```
-
-You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-co.re/launch).
-
 ### DRAGEN CNV QC
 
 With `--enable_cnvqc` (default `true`), `bin/analyze_cnv_metrics.R` reads the DRAGEN CNV output of all samples under `--dragen_dirs` (`*.cnv_metrics.csv`, `*.cnv.vcf.gz`, and if present `*.cnv.purity.coverage.models.tsv`, `*.cnv.excluded_intervals.bed.gz`, `*.tn.tsv.gz`, `*.tumor.baf.bedgraph.gz`) and sets a `QC_STATUS` of `PASS` or `FAIL` per sample.
@@ -271,6 +418,11 @@ A sample always fails if DRAGEN found no purity model (`EstimatedTumorPurity=NA`
 | `total_excluded_bp_max`         | total bp in `*.cnv.excluded_intervals.bed.gz` (`total_excluded_bp`) | value > max |
 
 The limits themselves pass (e.g. a purity of exactly `purity_min` passes). Purity is a fraction: `--purity_min 0.4` means 40 %. A value outside [0, 1] (e.g. `40`) stops the pipeline with an `ERROR`, as does any non-numeric threshold or an unknown option passed to the script.
+
+This is the only step tied to a specific caller: it reads **DRAGEN** CNV caller output only. Output
+from other CNV callers (CNVkit, GATK gCNV, ...) is not supported, so set `enable_cnvqc: false` for
+it. The thresholds have no built-in defaults. Noise metrics differ between panel, exome and genome
+data, so calibrate them for each assay.
 
 ### VAF histogram
 
@@ -370,11 +522,11 @@ one per assay (`SEQC2_PANEL`, `SEQC2_EXOME`, `SEQC2_GENOME`), shared by tumor an
 each assay is a separate sequencing run. Fingerprint IDs are thus e.g.
 `SEQC2_EXOME_HCC1395@SEQC2_EXOME`.
 
-| Step              | In the test profile | Expected result                                                              |
-| ----------------- | ------------------- | ---------------------------------------------------------------------------- |
-| FastQ Screen      | on                  | 97-100 % of reads hit `Human`, none hit `PhiX`                                |
-| Fingerprint check | on                  | see below                                                                    |
-| DRAGEN CNV QC     | off                 | not run; SEQC2 has no DRAGEN CNV output                                       |
+| Step              | In the test profile | Expected result                                                                   |
+| ----------------- | ------------------- | --------------------------------------------------------------------------------- |
+| FastQ Screen      | on                  | 97-100 % of reads hit `Human`, none hit `PhiX`                                    |
+| Fingerprint check | on                  | see below                                                                         |
+| DRAGEN CNV QC     | off                 | not run; SEQC2 has no DRAGEN CNV output                                           |
 | MultiQC           | always              | report with FastQ Screen, fingerprint overview/QC and Picard fingerprint sections |
 
 Fingerprint results on the test data (reference run with conda, 2026-11-18; the LOD scores are
@@ -383,7 +535,7 @@ on small regions:
 
 - **Panel samples: `INCONCLUSIVE`** (LOD 0), even against themselves. None of the 24
   haplotype-map SNPs fall inside the AmpliSeq amplicons. This is the panel restriction
-  described under [Fingerprint check](#fingerprint-check).
+  described under [Assay-type notes](#assay-type-notes).
 - **Fingerprint QC and database:** only the genome samples pass (21 of 24 sites with depth
   >= 10, self LOD 9.1 and 7.6, `SUITABLE`). The exome samples (6 blocks with reads, 2 passing
   sites, self LOD 2.0 and 1.4) are `INSUFFICIENT`, the panel samples `NO_COVERAGE`; all four

@@ -258,6 +258,7 @@ def toolCitationText() {
             params.enable_fingerprintcheck ? "Picard CrosscheckFingerprints and ExtractFingerprint (Picard Toolkit, Broad Institute), SAMtools and BCFtools (Danecek et al. 2021), HTSlib (Bonfield et al. 2021)," : "",
             params.enable_fingerprintcheck && params.fingerprint_qc_contamination_check ? "the contamination model of VerifyBamID (Jun et al. 2012)," : "",
             params.enable_fingerprintcheck && params.align_reads_for_fingerprint ? "BWA-MEM2 (Vasimuddin et al. 2019)," : "",
+            params.enable_cnvqc ? "karyoploteR (Gel and Serra 2017) for QC of DRAGEN CNV calls," : "",
             "MultiQC (Ewels et al. 2016)",
             "."
         ].join(' ').trim()
@@ -276,6 +277,7 @@ def toolBibliographyText() {
             params.enable_fingerprintcheck ? "<li>Bonfield, J. K., Marshall, J., Danecek, P., Li, H., Ohan, V., Whitwham, A., Keane, T., & Davies, R. M. (2021). HTSlib: C library for reading/writing high-throughput sequencing data. GigaScience, 10(2), giab007. doi: <a href='https://doi.org/10.1093/gigascience/giab007'>10.1093/gigascience/giab007</a></li>" : "",
             params.enable_fingerprintcheck && params.fingerprint_qc_contamination_check ? "<li>Jun, G., Flickinger, M., Hetrick, K. N., Romm, J. M., Doheny, K. F., Abecasis, G. R., Boehnke, M., & Kang, H. M. (2012). Detecting and estimating contamination of human DNA samples in sequencing and array-based genotype data. American Journal of Human Genetics, 91(5), 839-848. doi: <a href='https://doi.org/10.1016/j.ajhg.2012.09.004'>10.1016/j.ajhg.2012.09.004</a></li>" : "",
             params.enable_fingerprintcheck && params.align_reads_for_fingerprint ? "<li>Vasimuddin, Md., Misra, S., Li, H., & Aluru, S. (2019). Efficient Architecture-Aware Acceleration of BWA-MEM for Multicore Systems. 2019 IEEE International Parallel and Distributed Processing Symposium (IPDPS), 314-324. doi: <a href='https://doi.org/10.1109/IPDPS.2019.00041'>10.1109/IPDPS.2019.00041</a></li>" : "",
+            params.enable_cnvqc ? "<li>Gel, B., & Serra, E. (2017). karyoploteR: an R/Bioconductor package to plot customizable genomes displaying arbitrary data. Bioinformatics, 33(19), 3088–3090. doi: <a href='https://doi.org/10.1093/bioinformatics/btx346'>10.1093/bioinformatics/btx346</a></li>" : "",
             "<li>Ewels, P., Magnusson, M., Lundin, S., & Käller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. Bioinformatics , 32(19), 3047–3048. doi: /10.1093/bioinformatics/btw354</li>"
         ].findAll { entry -> entry }.join(' ').trim()
 

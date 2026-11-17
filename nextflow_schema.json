@@ -22,8 +22,8 @@
                     "schema": "assets/schema_input.json",
                     "mimetype": "text/csv",
                     "pattern": "^\\S+\\.csv$",
-                    "description": "Path to comma-separated samplesheet with one row per sample (and sequencing run). Columns: sample, fastq_1, fastq_2, bam.",
-                    "help_text": "Works for any short-read assay (gene panel, exome, genome). `sample` is required; `fastq_1`/`fastq_2` are required for every row when `--enable_fastqscreen` is set (leave `fastq_2` empty for single-end data); `bam` is required for every row when `--enable_fingerprintcheck` is set. See docs/usage.md.",
+                    "description": "Path to comma-separated samplesheet with one row per sample (and sequencing run). Columns: sample, fastq_1, fastq_2, bam, runid, vcf.",
+                    "help_text": "Works for any short-read assay (gene panel, exome, genome). `sample` is required; `fastq_1`/`fastq_2` are required for every row when `--enable_fastqscreen` is set (leave `fastq_2` empty for single-end data); `bam` (BAM, not CRAM; or FASTQ with `--align_reads_for_fingerprint`) and `runid` are required for every row when `--enable_fingerprintcheck` is set; `vcf` is optional (VAF histogram). See docs/usage.md.",
                     "fa_icon": "fas fa-file-csv"
                 },
                 "outdir": {

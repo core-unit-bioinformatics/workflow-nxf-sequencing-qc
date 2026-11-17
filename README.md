@@ -14,17 +14,34 @@
 
 ## Introduction
 
-**core-unit-bioinformatics/workflow-nxf-sequencing-qc** is a bioinformatics pipeline that ...
+**core-unit-bioinformatics/workflow-nxf-sequencing-qc** collects quality control for
+**short-read** sequencing runs in one MultiQC report. It does not depend on the assay type:
+**gene panels, exomes and genomes** run the same way, with the same samplesheet and parameters.
 
-<!-- TODO nf-core:
-   Complete this sentence with a 2-3 sentence summary of what types of data the pipeline ingests, a brief overview of the
-   major pipeline sections and the types of output it produces. You're giving an overview to someone new
-   to nf-core here, in 15-20 seconds. For an example, see https://github.com/nf-core/rnaseq/blob/master/README.md#introduction
--->
+The pipeline does not align reads (except optionally for the fingerprint check) or call variants.
+It runs QC tools on the FASTQ, BAM and VCF files you already have, and it collects metrics from
+existing pipeline output (for example DRAGEN, Picard or mosdepth) into one report.
 
-<!-- TODO nf-core: Include a figure that guides the user through the major workflow steps. Many nf-core
-     workflows use the "tube map" design for that. See https://nf-co.re/docs/community/brand/workflow-schematics#examples for examples.   -->
-<!-- TODO nf-core: Fill in short bullet-pointed list of the default steps in the pipeline -->
+## Features
+
+| Step                                    | Tool                                                                                                                                                                                                    | Input                                     | Assay types            | Default |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------- | ------- |
+| Sample identity / swap check            | [Picard CrosscheckFingerprints](https://broadinstitute.github.io/picard/) within the run                                                                                                                | BAM                                       | panel\*, exome, genome | on      |
+| Fingerprint QC and fingerprint database | [Picard ExtractFingerprint](https://broadinstitute.github.io/picard/), [samtools](https://www.htslib.org/), [bcftools](https://samtools.github.io/bcftools/), [PyVCF3](https://github.com/dridk/PyVCF3) | BAM + database of previous runs           | panel\*, exome, genome | on      |
+| Contamination / species screen          | [FastQ Screen](https://www.bioinformatics.babraham.ac.uk/projects/fastq_screen/)                                                                                                                        | FASTQ (single- or paired-end)             | panel, exome, genome   | on      |
+| CNV QC (purity, ploidy, noise, plots)   | `bin/analyze_cnv_metrics.R` + [karyoploteR](https://bioconductor.org/packages/karyoploteR/)                                                                                                             | **DRAGEN** CNV caller output              | exome, genome\*\*      | on      |
+| VAF histogram                           | `bin/vaf_histogram.py`                                                                                                                                                                                  | small-variant VCF (any caller)            | panel, exome, genome   | off     |
+| Report summary (CNV QC, TMB, MSI, HRD)  | `bin/exomeqc_summary.py`                                                                                                                                                                                | **DRAGEN** output, CNV and fingerprint QC | panel, exome, genome   | on      |
+| Aggregated report                       | [MultiQC](https://multiqc.info/)                                                                                                                                                                        | all of the above + extra directories      | panel, exome, genome   | always  |
+
+\* see [Restrictions](#restrictions). \*\* any assay DRAGEN somatic CNV calling supports.
+
+MultiQC also reads any directory listed in `--multiqc_inputs` and the DRAGEN directory
+given by `--dragen_dirs`. That way, DRAGEN mapping, coverage (WGS **and** target-region
+coverage) and variant-calling metrics, and the output of any other
+[MultiQC-supported tool](https://multiqc.info/modules/), show up in the same report.
+
+The steps in detail:
 
 1. Fingerprint check (`--enable_fingerprintcheck`)
    - crosscheck all BAMs of the run with each other ([`Picard CrosscheckFingerprints`](https://broadinstitute.github.io/picard/)), shown as heatmap
@@ -36,43 +53,81 @@
    - add the run to the database: updated database `exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` for the next run
    - overview in MultiQC: haplotype map, database, replaced fingerprints and whether each sample gave a suitable fingerprint
 2. Contamination screening ([`FastQ Screen`](https://www.bioinformatics.babraham.ac.uk/projects/fastq_screen/), `--enable_fastqscreen`)
-3. DRAGEN CNV QC (`--enable_cnvqc`)
-4. Present QC ([`MultiQC`](http://multiqc.info/))
+3. DRAGEN CNV QC (`--enable_cnvqc`): QC status per sample from DRAGEN CNV metrics with adjustable thresholds, purity/coverage model plot and karyotype plots ([`karyoploteR`](https://bioconductor.org/packages/karyoploteR/))
+4. VAF histogram (`--enable_vaf_histogram`): histogram of the variant allele fractions per sample from the samplesheet column `vcf`
+5. Report summary (`--enable_summary`, needs `--dragen_dirs`): one row per DRAGEN case with CNV QC status, purity, ploidy, TMB, MSI and HRD on top of the report
+6. Present QC ([`MultiQC`](http://multiqc.info/)), optionally named after the run (`--multiqc_report_name`)
+
+## Restrictions
+
+- **Short reads only.** The pipeline is built and tested for Illumina-type short reads.
+  Long-read data (ONT, PacBio) is not supported.
+- **CNV QC is DRAGEN-specific.** `--enable_cnvqc` only parses DRAGEN CNV caller output
+  (`*.cnv_metrics.csv`, `*.cnv.vcf.gz`, and if present `*.tn.tsv.gz`, `*.tumor.baf.bedgraph.gz`,
+  `*.cnv.purity.coverage.models.tsv`, `*.cnv.excluded_intervals.bed.gz`). Output from other CNV
+  callers (CNVkit, GATK gCNV, ...) is not supported. Turn the step off for non-DRAGEN data
+  (`enable_cnvqc: false`). The CNV thresholds have no built-in defaults and need to be calibrated
+  for each assay (panel, exome or genome). The report summary also reads DRAGEN output only.
+- **Fingerprinting needs BAM input.** CRAM is not supported yet; the pipeline stops with an
+  error if it gets CRAM files. The haplotype map must match the reference build (`--fasta`), and
+  the fingerprint database must be built with the same haplotype map. Fingerprints only work where
+  the map's loci are covered: for **small gene panels**, use a haplotype map built from SNPs inside
+  the panel targets, otherwise the results are `INCONCLUSIVE` and the fingerprint QC fails.
+- **FastQ Screen needs its own database.** Build it in advance (`fastq_screen --get_genomes`
+  or your own Bowtie2 indices). The pipeline never downloads anything.
+- **Offline / HPC.** No resources are downloaded at runtime. All databases and references
+  are passed in as parameters.
 
 ## Usage
 
 > [!NOTE]
 > If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/get_started/environment_setup/overview) on how to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/get_started/run-your-first-pipeline) with `-profile test_seqc2` (see [Test profile](#test-profile); `-profile test` is currently disabled) before running the workflow on actual data.
 
-<!-- TODO nf-core: Describe the minimum required steps to execute the pipeline, e.g. how to prepare samplesheets.
-     Explain what rows and columns represent. For instance (please edit as appropriate):
+Prepare a samplesheet (one row per sample and sequencing run):
 
-First, prepare a samplesheet with your input data that looks as follows:
-
-`samplesheet.csv`:
-
-```csv
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
+```csv title="samplesheet.csv"
+sample,fastq_1,fastq_2,bam,runid,vcf
+PANEL_01,PANEL_01_R1.fastq.gz,PANEL_01_R2.fastq.gz,PANEL_01.bam,20260101_LH00001_0001_AXXXXXXXX,PANEL_01.vcf.gz
+WGS_01,WGS_01_R1.fastq.gz,WGS_01_R2.fastq.gz,WGS_01.bam,20260101_LH00001_0001_AXXXXXXXX,
+SE_01,SE_01_R1.fastq.gz,,SE_01.bam,20260101_LH00001_0001_AXXXXXXXX,
 ```
 
-Each row represents a fastq file (single-end) or a pair of fastq files (paired end).
+- `fastq_1`/`fastq_2` are needed for every row when FastQ Screen is on. Leave `fastq_2`
+  empty for single-end data.
+- `bam` (BAM, not CRAM) and `runid` are needed for every row when the fingerprint check is on.
+- `vcf` is optional and only used by the VAF histogram.
 
--->
+Put the parameters in a params file:
 
-Now, you can run the pipeline using:
+```yaml title="params.yaml"
+input: samplesheet.csv
+outdir: results
+fastqscreen_database: /path/to/FastQ_Screen_Genomes
+fingerprint_haplotype_map: /path/to/haplotype_map.txt
+fasta: /path/to/genome.fasta
+# fingerprint database of the previous run (optional)
+fingerprint_database: /path/to/previous/results/fingerprintcheck/database/exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz
+# DRAGEN only; leave out and set enable_cnvqc: false for other callers
+dragen_dirs: /path/to/dragen_output
+multiqc_report_name: 20260101_LH00001_0001_AXXXXXXXX
+```
 
-<!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
+Then run:
 
 ```bash
 nextflow run core-unit-bioinformatics/workflow-nxf-sequencing-qc \
    -profile <docker/singularity/.../institute> \
-   --input samplesheet.csv \
-   --outdir <OUTDIR>
+   -params-file params.yaml
 ```
+
+> [!IMPORTANT]
+> Switch steps off in the params file (for example `enable_cnvqc: false`).
+> `--enable_cnvqc false` on the command line is passed as a string and fails parameter validation.
 
 > [!WARNING]
 > Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/running/run-pipelines#using-parameter-files).
+
+For all parameters see [docs/usage.md](docs/usage.md); for the output files see [docs/output.md](docs/output.md).
 
 ## Test profile
 
@@ -94,7 +149,8 @@ Run `nextflow` from the directory that contains `testdata/`, or pass
 
 ## Credits
 
-core-unit-bioinformatics/workflow-nxf-sequencing-qc was originally written by Kai Horny.
+core-unit-bioinformatics/workflow-nxf-sequencing-qc was originally written by Kai Horny
+(previously named `exomeqc`).
 
 We thank the following people for their extensive assistance in the development of this pipeline:
 
