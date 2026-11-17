@@ -3,12 +3,18 @@
     SUBWORKFLOW: FINGERPRINTCHECK
     1. Crosscheck the fingerprints of all samples of this run (Picard
        CrosscheckFingerprints on the BAMs, heatmap in MultiQC).
-    2. Extract one fingerprint VCF per sample (Picard ExtractFingerprint).
+    2. Extract one fingerprint VCF per sample (Picard ExtractFingerprint) and
+       check its quality: each haplotype site must reach adjustable depth and
+       base quality thresholds (samtools mpileup, fingerprint_qc.py), failed
+       sites are masked (flat genotype likelihoods), the contamination is
+       estimated, and the sample gets a QC status. Site values go into the
+       fingerprint VCF (bcftools annotate), the status with thresholds and
+       values into its ##SAMPLE header line.
        If a fingerprint database of previous runs is given: check it against
        the haplotype map, drop the fingerprints this run replaces, convert it
        to bgzip with index, and crosscheck this run against it. Then add this
        run's fingerprints to it: the updated database, with a timestamp in
-       the file name. Report the fingerprint check and the matches with
+       the file name and one ##SAMPLE QC line per fingerprint. Report the fingerprint check and the matches with
        samples of other runs.
     Samples without a BAM are aligned with bwa-mem2 if align_reads is true.
     Fingerprint IDs are <sample>@<runid>, so that the same sample sequenced in
@@ -28,6 +34,13 @@ include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_FINGERPRINT_DATABASE                   
 include { PICARD_CROSSCHECKFINGERPRINTS as PICARD_CROSSCHECKFINGERPRINTS_DATABASE } from '../../../modules/nf-core/picard/crosscheckfingerprints/main'
 include { BCFTOOLS_MERGE as BCFTOOLS_MERGE_FINGERPRINT_DATABASE                  } from '../../../modules/nf-core/bcftools/merge/main'
 include { FINGERPRINT_DATABASE_REPORT                                            } from '../../../modules/local/fingerprint_database_report/main'
+include { GAWK as GAWK_FINGERPRINT_SITES                                         } from '../../../modules/nf-core/gawk/main'
+include { SAMTOOLS_MPILEUP as SAMTOOLS_MPILEUP_FINGERPRINT                       } from '../../../modules/nf-core/samtools/mpileup/main'
+include { FINGERPRINT_QC                                                         } from '../../../modules/local/fingerprint_qc/main'
+include { HTSLIB_BGZIPTABIX as HTSLIB_BGZIPTABIX_FINGERPRINT_QC                  } from '../../../modules/nf-core/htslib/bgziptabix/main'
+include { BCFTOOLS_ANNOTATE as BCFTOOLS_ANNOTATE_FINGERPRINT_QC                  } from '../../../modules/nf-core/bcftools/annotate/main'
+include { FINGERPRINT_DATABASE_HEADER                                            } from '../../../modules/local/fingerprint_database_header/main'
+include { BCFTOOLS_REHEADER as BCFTOOLS_REHEADER_FINGERPRINT_DATABASE            } from '../../../modules/nf-core/bcftools/reheader/main'
 
 workflow FINGERPRINTCHECK {
 
@@ -210,8 +223,63 @@ workflow FINGERPRINTCHECK {
     )
 
     // join each fingerprint VCF with its tabix index: [ meta, vcf, tbi ]
-    ch_fingerprints = PICARD_EXTRACTFINGERPRINT.out.vcf
+    ch_fingerprints_raw = PICARD_EXTRACTFINGERPRINT.out.vcf
         .join(PICARD_EXTRACTFINGERPRINT.out.tbi, by: 0, failOnMismatch: true, failOnDuplicate: true)
+
+    // -------------------------------------------------------------------------
+    // 2b. Fingerprint QC of each sample
+    // -------------------------------------------------------------------------
+    // BED of all SNPs of the haplotype map (value channel: the input is a value)
+    GAWK_FINGERPRINT_SITES(
+        channel.value([ [ id: 'haplotype_map_sites' ], haplotype_map_file, 'bed' ]),
+        [],
+        false
+    )
+    ch_sites_bed = GAWK_FINGERPRINT_SITES.out.output.map { _meta, bed -> bed }
+
+    // every base at the map SNPs with base and mapping quality and read name
+    ch_fasta_with_fai = ch_fasta
+        .combine(ch_fai)
+        .map { meta, fa, fai -> [ meta, fa, fai ] }
+        .first()
+
+    SAMTOOLS_MPILEUP_FINGERPRINT(
+        ch_bam_with_index
+            .combine(ch_sites_bed)
+            .map { meta, bam, index, bed -> [ meta, bam, index, bed ] },
+        ch_fasta_with_fai
+    )
+
+    // site QC, contamination and QC status: [ meta, fingerprint vcf, pileup ]
+    FINGERPRINT_QC(
+        ch_fingerprints_raw
+            .join(SAMTOOLS_MPILEUP_FINGERPRINT.out.mpileup, by: 0, failOnMismatch: true, failOnDuplicate: true)
+            .map { meta, vcf, _tbi, pileup -> [ meta, vcf, pileup ] },
+        haplotype_map_file
+    )
+
+    // bgzip and tabix-index the site table for bcftools annotate
+    HTSLIB_BGZIPTABIX_FINGERPRINT_QC(
+        FINGERPRINT_QC.out.sites.map { meta, sites -> [ meta, sites, [], [] ] },
+        'compress',
+        true,
+        ''
+    )
+
+    // write the QC values into the fingerprint, mask failed sites (flat PL)
+    // and add the ##SAMPLE QC line:
+    // [ meta, vcf, tbi, annotations, annotations_index, columns, header_lines, rename_chrs ]
+    BCFTOOLS_ANNOTATE_FINGERPRINT_QC(
+        ch_fingerprints_raw
+            .join(HTSLIB_BGZIPTABIX_FINGERPRINT_QC.out.output, by: 0, failOnMismatch: true, failOnDuplicate: true)
+            .join(HTSLIB_BGZIPTABIX_FINGERPRINT_QC.out.index, by: 0, failOnMismatch: true, failOnDuplicate: true)
+            .join(FINGERPRINT_QC.out.header, by: 0, failOnMismatch: true, failOnDuplicate: true)
+            .map { meta, vcf, tbi, sites, sites_index, header -> [ meta, vcf, tbi, sites, sites_index, [], header, [] ] }
+    )
+
+    // fingerprints after QC, used for the database: [ meta, vcf, tbi ]
+    ch_fingerprints = BCFTOOLS_ANNOTATE_FINGERPRINT_QC.out.vcf
+        .join(BCFTOOLS_ANNOTATE_FINGERPRINT_QC.out.index, by: 0, failOnMismatch: true, failOnDuplicate: true)
 
     // all fingerprints of this run as two lists: [ [ vcf, ... ], [ tbi, ... ] ]
     ch_fingerprint_lists = ch_fingerprints
@@ -229,7 +297,7 @@ workflow FINGERPRINTCHECK {
         def database_file = file(fingerprint_database, checkIfExists: true)
 
         // ---------------------------------------------------------------------
-        // 2b. Check the given database against the haplotype map and list the
+        // 2c. Check the given database against the haplotype map and list the
         // fingerprints this run replaces (same <sample>@<runid>)
         // ---------------------------------------------------------------------
         // this run's fingerprint IDs are known from the samplesheet, so the
@@ -246,7 +314,7 @@ workflow FINGERPRINTCHECK {
         )
 
         // ---------------------------------------------------------------------
-        // 2c. Keep the listed fingerprints and write them as bgzipped VCF with
+        // 2d. Keep the listed fingerprints and write them as bgzipped VCF with
         // tabix index; bcftools reads plain VCF, gzip and bgzip, and needs no
         // index here. Skipped if the database holds only this run's IDs.
         // ---------------------------------------------------------------------
@@ -266,7 +334,7 @@ workflow FINGERPRINTCHECK {
             .join(BCFTOOLS_VIEW_FINGERPRINT_DATABASE.out.index, by: 0, failOnMismatch: true)
 
         // ---------------------------------------------------------------------
-        // 2d. Crosscheck this run's fingerprints against the kept database
+        // 2e. Crosscheck this run's fingerprints against the kept database
         // fingerprints, before this run is added to the database
         // ---------------------------------------------------------------------
         ch_crosscheck_database_input = ch_fingerprint_lists
@@ -302,7 +370,7 @@ workflow FINGERPRINTCHECK {
     }
 
     // -------------------------------------------------------------------------
-    // 2e. Add this run's fingerprints to the kept database fingerprints:
+    // 2f. Add this run's fingerprints to the kept database fingerprints:
     // updated database exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz
     // -------------------------------------------------------------------------
     ch_merge_input = ch_fingerprint_lists
@@ -314,35 +382,63 @@ workflow FINGERPRINTCHECK {
 
     BCFTOOLS_MERGE_FINGERPRINT_DATABASE(ch_merge_input, [ [:], [], [] ])
 
+    // merged database: [ meta, vcf ]
+    ch_database_merged = BCFTOOLS_MERGE_FINGERPRINT_DATABASE.out.vcf
+
+    // one ##SAMPLE QC line per fingerprint: bcftools merge and view keep
+    // outdated lines of replaced fingerprints, so the header is rewritten
+    FINGERPRINT_DATABASE_HEADER(
+        ch_database_merged,
+        FINGERPRINT_QC.out.header.map { _meta, header -> header }.collect()
+    )
+
+    BCFTOOLS_REHEADER_FINGERPRINT_DATABASE(
+        ch_database_merged
+            .join(FINGERPRINT_DATABASE_HEADER.out.header, by: 0, failOnMismatch: true)
+            .map { meta, vcf, header -> [ meta, vcf, header, [] ] },
+        [ [:], [] ]
+    )
+
     // updated database with its index: [ meta, vcf, tbi ]
-    ch_database = BCFTOOLS_MERGE_FINGERPRINT_DATABASE.out.vcf
-        .join(BCFTOOLS_MERGE_FINGERPRINT_DATABASE.out.index, by: 0, failOnMismatch: true)
+    ch_database = BCFTOOLS_REHEADER_FINGERPRINT_DATABASE.out.vcf
+        .join(BCFTOOLS_REHEADER_FINGERPRINT_DATABASE.out.index, by: 0, failOnMismatch: true)
 
     // -------------------------------------------------------------------------
-    // 2f. Report the fingerprint check and the matches with other runs
+    // 2g. Report the fingerprint QC, the fingerprint check and the matches
+    // with other runs
     // -------------------------------------------------------------------------
+    // all QC summaries of this run as one list
+    ch_qc_summaries = FINGERPRINT_QC.out.summary
+        .map { _meta, summary -> summary }
+        .collect()
+        .map { summaries -> [ summaries ] }
+
     ch_report_input = ch_fingerprint_lists
         .combine(ch_run_samples)
         .combine(PICARD_CROSSCHECKFINGERPRINTS.out.crosscheck_metrics)
         .combine(ch_database)
         .combine(ch_database_check)
         .combine(ch_database_crosscheck)
-        .map { vcfs, _tbis, run_samples, _meta_run, run_crosscheck, _meta_database, database, _database_index, database_check, database_samples, database_crosscheck ->
-            [ [ id: 'fingerprint_database' ], run_samples, vcfs, haplotype_map_file, run_crosscheck, database, database_check, database_samples, database_crosscheck ]
+        .combine(ch_qc_summaries)
+        .map { vcfs, _tbis, run_samples, _meta_run, run_crosscheck, _meta_database, database, _database_index, database_check, database_samples, database_crosscheck, qc_summaries ->
+            [ [ id: 'fingerprint_database' ], run_samples, vcfs, haplotype_map_file, run_crosscheck, database, database_check, database_samples, database_crosscheck, qc_summaries ]
         }
 
     FINGERPRINT_DATABASE_REPORT(ch_report_input)
 
     emit:
     crosscheck_metrics          = PICARD_CROSSCHECKFINGERPRINTS.out.crosscheck_metrics          // channel: [ meta, crosscheck_metrics.txt ]
-    fingerprints                = ch_fingerprints                                               // channel: [ meta, vcf.gz, tbi ]
+    fingerprints                = ch_fingerprints                                               // channel: [ meta, vcf.gz, tbi ] (after QC)
+    fingerprint_qc              = FINGERPRINT_QC.out.summary                                    // channel: [ meta, tsv ]
     database                    = ch_database                                                   // channel: [ meta, vcf.gz, tbi ]
     database_check              = ch_database_check_results                                     // channel: [ meta, tsv ] (only with a given database)
     database_crosscheck_metrics = ch_database_crosscheck_metrics                                // channel: [ meta, crosscheck_metrics.txt ] (only with kept database fingerprints)
     database_matches            = FINGERPRINT_DATABASE_REPORT.out.matches                       // channel: [ meta, tsv ]
     database_fingerprints       = FINGERPRINT_DATABASE_REPORT.out.fingerprints                  // channel: [ meta, tsv ]
     database_summary            = FINGERPRINT_DATABASE_REPORT.out.summary                       // channel: [ meta, tsv ]
+    fingerprint_qc_report       = FINGERPRINT_DATABASE_REPORT.out.qc                            // channel: [ meta, tsv ] (all samples of this run)
     database_multiqc            = FINGERPRINT_DATABASE_REPORT.out.overview
+        .mix(FINGERPRINT_DATABASE_REPORT.out.qc_multiqc)
         .mix(FINGERPRINT_DATABASE_REPORT.out.multiqc)                                           // channel: [ meta, _mqc.html or _mqc.tsv ]
     versions                    = ch_versions
 }

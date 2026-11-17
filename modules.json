@@ -50,6 +50,11 @@
                         "git_sha": "7b3452a23773f687ededb4befd037920e5a51341",
                         "installed_by": ["modules"]
                     },
+                    "htslib/bgziptabix": {
+                        "branch": "master",
+                        "git_sha": "e316df2a11df4c74988d68a1147878d76c5972a0",
+                        "installed_by": ["modules"]
+                    },
                     "multiqc": {
                         "branch": "master",
                         "git_sha": "98403d15b0e50edae1f3fec5eae5e24982f1fade",
@@ -84,11 +89,6 @@
                     "samtools/mpileup": {
                         "branch": "master",
                         "git_sha": "80eb474060aa4aa6d7b4b00e0dc785174f156a28",
-                        "installed_by": ["modules"]
-                    },
-                    "tabix/bgziptabix": {
-                        "branch": "master",
-                        "git_sha": "efe94a0ea5cad01b5cad21f7112644bfab4ea2b7",
                         "installed_by": ["modules"]
                     }
                 }

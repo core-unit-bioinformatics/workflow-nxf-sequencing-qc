@@ -50,6 +50,7 @@ def write_run(run, self_lods=None, depths=None):
             path, vcf_text([f], fingerprint_records([f], depth=depths.get(f, 10)))
         )
         fingerprints.append(path)
+    write_qc(run)
     comparisons = [
         (bam(a), bam(b), self_lods.get(a, 40.0) if a == b else -100.0)
         for a in run
@@ -57,6 +58,66 @@ def write_run(run, self_lods=None, depths=None):
     ]
     write_metrics("run_crosscheck.txt", comparisons, data_type="FILE")
     return fingerprints
+
+
+QC = load_script("fingerprint_qc")
+
+
+def qc_summary_row(fingerprint_id, status="PASS"):
+    """A QC summary row as fingerprint_qc.py writes it."""
+    sample, run = fingerprint_id.split("@")
+    values = {
+        "fingerprint_id": fingerprint_id,
+        "sample": sample,
+        "runid": run,
+        "status": status,
+        "failed_criteria": "." if status == "PASS" else "Contamination",
+        "qc_date": "2026-01-01",
+        "exomeqc_version": "1.1.1",
+        "haplotype_sites": "5",
+        "passing_sites": "5",
+        "fraction_passing_sites": "1.000",
+        "sites_low_depth": "0",
+        "sites_low_base_quality": "0",
+        "sites_no_likelihoods": "0",
+        "mean_site_depth": "20.0",
+        "mean_site_base_quality": "37.0",
+        "contamination": "0.0010" if status == "PASS" else "0.0800",
+        "contamination_sites": "5",
+        "min_base_quality": "20",
+        "min_mapping_quality": "20",
+        "min_site_depth": "10",
+        "min_site_mean_base_quality": "25",
+        "min_fraction_passing_sites": "0.5",
+        "max_contamination": "0.03",
+    }
+    return [values[c] for c in QC.SUMMARY_COLUMNS]
+
+
+def write_qc(run, statuses=None):
+    """Write one QC summary per run sample; return the paths."""
+    statuses = statuses or {}
+    paths = []
+    for f in run:
+        path = f"{bam(f)[:-4]}.fingerprint_qc_summary.tsv"
+        Path(path).write_text(
+            "\t".join(QC.SUMMARY_COLUMNS)
+            + "\n"
+            + "\t".join(qc_summary_row(f, statuses.get(f, "PASS")))
+            + "\n"
+        )
+        paths.append(path)
+    return paths
+
+
+def write_database(samples, statuses=None):
+    """Write the updated database with one ##SAMPLE QC line per fingerprint."""
+    statuses = statuses or {}
+    lines = [
+        f"##SAMPLE=<ID={f},ExomeqcFingerprintQC={statuses.get(f, 'PASS')}>"
+        for f in samples
+    ]
+    write_vcf("updated.vcf.gz", vcf_text(samples, header_lines=lines))
 
 
 def write_database_check(rows, path_prefix="previous"):
@@ -71,8 +132,10 @@ def write_database_check(rows, path_prefix="previous"):
     )
 
 
-def base_args(fingerprints):
+def base_args(fingerprints, run=RUN):
     return [
+        "--qc-summaries",
+        *[f"{bam(f)[:-4]}.fingerprint_qc_summary.tsv" for f in run],
         "--run-samples",
         "run.tsv",
         "--fingerprints",
@@ -95,7 +158,7 @@ def scenario(tmp_path, monkeypatch):
     write_map("map.txt")
     fingerprints = write_run(RUN)
     write_database_check([(f, "keep") for f in PREVIOUS])
-    write_vcf("updated.vcf.gz", vcf_text(PREVIOUS + RUN))
+    write_database(PREVIOUS + RUN)
     comparisons = [
         (left, right, LODS[(left, right)]) for left in RUN for right in PREVIOUS
     ]
@@ -257,7 +320,7 @@ def test_replaced_fingerprints_are_reported(scenario, capsys):
 
 def test_all_fingerprints_replaced(scenario):
     write_database_check([(f, "replace") for f in RUN])
-    write_vcf("updated.vcf.gz", vcf_text(RUN))
+    write_database(RUN)
     args = scenario["args"][: scenario["args"].index("--crosscheck")]
     report.main(args)
     assert read_tsv("fingerprint_database_matches.tsv") == []
@@ -267,7 +330,7 @@ def test_all_fingerprints_replaced(scenario):
 
 
 def test_no_database_writes_note(scenario):
-    write_vcf("updated.vcf.gz", vcf_text(RUN))
+    write_database(RUN)
     report.main(base_args(scenario["fingerprints"]))
     assert read_tsv("fingerprint_database_matches.tsv") == []
     note = Path("fingerprint_database_matches_mqc.html").read_text()
@@ -328,7 +391,7 @@ def test_error_self_comparison_in_database_crosscheck(scenario, capsys):
 
 def test_error_crosscheck_without_kept_fingerprints(scenario, capsys):
     write_database_check([(f, "replace") for f in RUN])
-    write_vcf("updated.vcf.gz", vcf_text(RUN))
+    write_database(RUN)
     run_expecting_error(
         scenario["args"], capsys, "--crosscheck must be given exactly when"
     )
@@ -355,7 +418,7 @@ def test_error_replace_action_for_other_run(scenario, capsys):
 
 
 def test_error_updated_database_lost_fingerprints(scenario, capsys):
-    write_vcf("updated.vcf.gz", vcf_text(RUN + PREVIOUS[:1]))
+    write_database(RUN + PREVIOUS[:1])
     run_expecting_error(scenario["args"], capsys, f"missing: {PREVIOUS[1]}")
 
 
@@ -392,3 +455,99 @@ def test_error_duplicate_run_sample(scenario, capsys):
 def test_error_empty_metrics(scenario, capsys):
     write_metrics("metrics.txt", [])
     run_expecting_error(scenario["args"], capsys, "no comparisons in the metrics table")
+
+
+# --- fingerprint QC -------------------------------------------------------
+
+
+def test_qc_tables_and_multiqc_section(scenario, capsys):
+    write_qc(RUN, {RUN[1]: "FAIL"})
+    write_database(PREVIOUS + RUN, {RUN[1]: "FAIL"})
+    report.main(scenario["args"])
+    rows = {r["fingerprint_id"]: r for r in read_tsv("fingerprint_database_qc.tsv")}
+    assert set(rows) == set(RUN)
+    assert rows[RUN[1]]["status"] == "FAIL"
+    assert rows[RUN[1]]["max_contamination"] == "0.03"
+    fingerprints = {
+        r["fingerprint_id"]: r
+        for r in read_tsv("fingerprint_database_fingerprints.tsv")
+    }
+    assert fingerprints[RUN[1]]["fingerprint_qc"] == "FAIL"
+    summary = read_summary()
+    assert (summary["run_samples_qc_pass"], summary["run_samples_qc_fail"]) == (
+        "2",
+        "1",
+    )
+    assert (summary["database_qc_pass"], summary["database_qc_fail"]) == ("4", "1")
+    mqc = Path("fingerprint_database_qc_mqc.tsv").read_text()
+    assert "# id: 'exomeqc_fingerprint_qc'" in mqc
+    assert "cond_formatting_rules" in mqc
+    # the thresholds are named in the section description
+    assert "is &ge; 10" in mqc and "&le; 0.03" in mqc
+    table = [line.split("\t") for line in mqc.splitlines() if not line.startswith("#")]
+    assert table[0][0] == "fingerprint_id"
+    assert {row[0] for row in table[1:]} == set(RUN)
+    overview = Path("fingerprint_database_overview_mqc.html").read_text()
+    assert "<strong>Fingerprint QC:</strong> 2 PASS, 1 FAIL" in overview
+    assert 'label-danger">FAIL' in overview
+    assert (
+        f"WARNING: {RUN[1]}: fingerprint QC FAIL (Contamination)"
+        in capsys.readouterr().err
+    )
+
+
+def test_missing_contamination_is_empty_in_multiqc(scenario):
+    path = write_qc(RUN)[0]
+    text = Path(path).read_text().replace("\t0.0010\t", "\t.\t")
+    Path(path).write_text(text)
+    report.main(scenario["args"])
+    mqc = Path("fingerprint_database_qc_mqc.tsv").read_text()
+    row = next(line for line in mqc.splitlines() if line.startswith(RUN[0]))
+    header = next(
+        line for line in mqc.splitlines() if line.startswith("fingerprint_id")
+    )
+    assert dict(zip(header.split("\t"), row.split("\t")))["contamination"] == ""
+
+
+def test_matches_show_qc_of_both_fingerprints(scenario):
+    write_database(PREVIOUS + RUN, {PREVIOUS[0]: "FAIL", PREVIOUS[1]: "NOT_RECORDED"})
+    report.main(scenario["args"])
+    rows = read_tsv("fingerprint_database_matches.tsv")
+    assert [
+        (r["database_sample"], r["fingerprint_qc"], r["database_fingerprint_qc"])
+        for r in rows
+    ] == [
+        ("SYN001_3-N", "PASS", "FAIL"),
+        ("SYN002_1-T", "PASS", "NOT_RECORDED"),
+        ("SYN001_3-N", "PASS", "FAIL"),
+    ]
+    assert read_summary()["database_qc_not_recorded"] == "1"
+    assert "Database QC" in Path("fingerprint_database_matches_mqc.tsv").read_text()
+
+
+def test_error_database_without_qc_line(scenario, capsys):
+    write_vcf("updated.vcf.gz", vcf_text(PREVIOUS + RUN))
+    run_expecting_error(scenario["args"], capsys, "no fingerprint QC (##SAMPLE) line")
+
+
+def test_error_database_qc_disagrees_with_summary(scenario, capsys):
+    write_database(PREVIOUS + RUN, {RUN[0]: "FAIL"})
+    run_expecting_error(
+        scenario["args"], capsys, "is FAIL in the database, PASS in its QC summary"
+    )
+
+
+def test_error_missing_qc_summary(scenario, capsys):
+    args = list(scenario["args"])
+    args.pop(args.index("--qc-summaries") + 1)
+    run_expecting_error(
+        args, capsys, "no fingerprint QC summary for sample(s) of this run"
+    )
+
+
+def test_error_qc_summary_with_other_columns(scenario, capsys):
+    path = write_qc(RUN)[0]
+    Path(path).write_text("fingerprint_id\tstatus\n" + f"{RUN[0]}\tPASS\n")
+    run_expecting_error(
+        scenario["args"], capsys, "expected the columns of fingerprint_qc.py"
+    )

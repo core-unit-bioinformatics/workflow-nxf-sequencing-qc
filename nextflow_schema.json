@@ -98,6 +98,53 @@
                     "exclusiveMinimum": 0,
                     "description": "LOD threshold T for comparisons with the fingerprint database: match if LOD >= T, mismatch if LOD <= -T, inconclusive in between.",
                     "help_text": "A LOD of N means the two fingerprints are 10^N times more likely to come from the same individual than from different ones. Also used for the fingerprint of each sample: SUITABLE if its self LOD (the sample's BAM compared with itself) is >= T, else INSUFFICIENT."
+                },
+                "fingerprint_qc_min_base_quality": {
+                    "type": "integer",
+                    "default": 20,
+                    "minimum": 0,
+                    "maximum": 93,
+                    "description": "Fingerprint QC: minimum base quality of a base to count for the depth (FPDP), the allele depths and the contamination estimate.",
+                    "help_text": "Bases below are left out. Each read name counts once per haplotype site. Stored in the fingerprint database as MinBaseQuality."
+                },
+                "fingerprint_qc_min_mapping_quality": {
+                    "type": "integer",
+                    "default": 20,
+                    "minimum": 0,
+                    "maximum": 255,
+                    "description": "Fingerprint QC: minimum mapping quality of a read to count at a haplotype site.",
+                    "help_text": "Reads below are left out of the depth (FPDP) and the mean base quality (FPBQ). Stored in the fingerprint database as MinMappingQuality."
+                },
+                "fingerprint_qc_min_site_depth": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "Fingerprint QC: minimum depth (FPDP) of a haplotype site to pass.",
+                    "help_text": "FPDP counts the bases with base and mapping quality at least the thresholds above. Sites below get the filter FpLowDepth and flat genotype likelihoods (PL 0,0,0), so they do not contribute to fingerprint comparisons. Stored as MinSiteDepth."
+                },
+                "fingerprint_qc_min_site_mean_base_quality": {
+                    "type": "number",
+                    "default": 25,
+                    "minimum": 0,
+                    "maximum": 93,
+                    "description": "Fingerprint QC: minimum mean base quality (FPBQ) of a haplotype site to pass.",
+                    "help_text": "FPBQ is the mean base quality of all bases with mapping quality at least --fingerprint_qc_min_mapping_quality. Sites below get the filter FpLowBaseQuality and flat genotype likelihoods. Stored as MinSiteMeanBaseQuality."
+                },
+                "fingerprint_qc_min_fraction_passing_sites": {
+                    "type": "number",
+                    "default": 0.5,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Fingerprint QC: minimum fraction of haplotype sites that pass for the sample to pass.",
+                    "help_text": "Set it according to the haplotype map: with a map of SNPs outside the targets of the exome kit, few sites reach the depth. Stored as MinFractionPassingSites."
+                },
+                "fingerprint_qc_max_contamination": {
+                    "type": "number",
+                    "default": 0.03,
+                    "minimum": 0,
+                    "maximum": 0.5,
+                    "description": "Fingerprint QC: maximum estimated contamination (fraction of reads from another person) for the sample to pass.",
+                    "help_text": "Estimated by maximum likelihood from the high-quality bases of the passing sites and the allele frequencies (MAF) of the haplotype map (model of VerifyBamID FREEMIX). Allelic imbalance in tumour samples (loss of heterozygosity, copy number changes) raises the estimate. Stored as MaxContamination."
                 }
             }
         },

@@ -84,6 +84,21 @@ def sample_id(line):
     return match.group(1) if match else None
 
 
+def parse_sample_line(line, source):
+    """Return the key=value pairs of a ##SAMPLE=<...> line as dict (ID included)."""
+    if not (line.startswith("##SAMPLE=<") and line.endswith(">")):
+        fail(f"{source}: not a ##SAMPLE=<...> line: '{line}'")
+    values = {}
+    for pair in line[len("##SAMPLE=<") : -1].split(","):
+        key, separator, value = pair.partition("=")
+        if not separator or not key or key in values:
+            fail(f"{source}: malformed or repeated key '{pair}' in '{line}'")
+        values[key] = value
+    if "ID" not in values:
+        fail(f"{source}: ##SAMPLE line without ID: '{line}'")
+    return values
+
+
 def read_run_qc(paths, database_samples):
     """{fingerprint_id: ##SAMPLE line} of this run's QC header files."""
     run_lines = {}

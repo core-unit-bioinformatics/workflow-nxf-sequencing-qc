@@ -14,7 +14,10 @@ Inputs are the outputs of the FINGERPRINTCHECK subworkflow:
       this run) and the crosscheck of this run's fingerprints against the
       kept fingerprints (INPUT this run, SECOND_INPUT the database,
       CROSSCHECK_BY SAMPLE, CROSSCHECK_MODE CHECK_ALL_OTHERS)
-    - the updated database (header only: its sample names)
+    - the updated database (header only: its sample names and the
+      ##SAMPLE fingerprint QC line of each fingerprint)
+    - the fingerprint QC summary of each sample of this run
+      (bin/fingerprint_qc.py): QC status, thresholds and values
 
 The database is checked before this run's fingerprints are added, so a sample
 never meets its own new fingerprint there; comparisons among this run's
@@ -37,6 +40,13 @@ Reported (table and MultiQC section): UNEXPECTED_MATCH, EXPECTED_MATCH,
 UNEXPECTED_MISMATCH and expected INCONCLUSIVE comparisons. EXPECTED_MISMATCH
 and INCONCLUSIVE comparisons between different sample IDs are only counted.
 
+Fingerprint QC of each sample of this run (fingerprint_qc.py): PASS or
+FAIL with the failed criteria, the values and the thresholds; reported as
+table and MultiQC section "Fingerprint QC". The QC status of both
+fingerprints of a reported comparison is listed with it, as the database
+holds the QC status of each fingerprint (NOT_RECORDED for fingerprints added
+before the QC existed).
+
 Fingerprint of each sample of this run:
 
     NO_COVERAGE    no read at any haplotype block of the map
@@ -51,6 +61,8 @@ the heatmap.
 Outputs (in the working directory, <prefix> from --prefix):
     <prefix>_matches.tsv          reported comparisons, all columns
     <prefix>_fingerprints.tsv     fingerprint of each sample of this run
+    <prefix>_qc.tsv               fingerprint QC of each sample of this run
+    <prefix>_qc_mqc.tsv           MultiQC custom content table of the QC
     <prefix>_summary.tsv          counts (metric, value)
     <prefix>_overview_mqc.html    MultiQC section: overview of the check
     <prefix>_matches_mqc.tsv      MultiQC custom content table, or
@@ -76,6 +88,13 @@ from check_fingerprint_database import (
     split_fingerprint_id,
     warning,
 )
+from fingerprint_database_header import (
+    NOT_RECORDED,
+    parse_sample_line,
+    read_header,
+    sample_id,
+)
+from fingerprint_qc import SAMPLE_QC_KEY, SUMMARY_COLUMNS
 
 RUN_SAMPLES_COLUMNS = ["fingerprint_id", "sample", "runid", "bam"]
 DATABASE_SAMPLES_COLUMNS = ["fingerprint_id", "sample", "runid", "action"]
@@ -100,6 +119,8 @@ MATCH_COLUMNS = [
     "runid",
     "database_sample",
     "database_runid",
+    "fingerprint_qc",
+    "database_fingerprint_qc",
     "status",
     "lod_score",
     "lod_score_tumor_normal",
@@ -115,9 +136,12 @@ FINGERPRINT_COLUMNS = [
     "mean_depth",
     "self_lod",
     "status",
+    "fingerprint_qc",
 ]
 MQC_ID = "exomeqc_fingerprint_database"
 MQC_OVERVIEW_ID = "exomeqc_fingerprint_overview"
+MQC_QC_ID = "exomeqc_fingerprint_qc"
+QC_STATUSES = ["PASS", "FAIL", NOT_RECORDED]
 
 
 def read_tsv(path, columns):
@@ -372,8 +396,11 @@ def check_comparisons(rows, run_samples, database_samples, path):
         )
 
 
-def build_report(rows, run_samples, threshold):
-    """Classify the comparisons, return reported rows and counts."""
+def build_report(rows, run_samples, threshold, qc_status):
+    """Classify the comparisons, return reported rows and counts.
+
+    qc_status: {fingerprint_id: QC status} of this run and the database.
+    """
     counts = {status: 0 for status in ALL_STATUSES}
     unreported_inconclusive = 0
     reported = []
@@ -396,6 +423,8 @@ def build_report(rows, run_samples, threshold):
                     "runid": runid,
                     "database_sample": database_sample,
                     "database_runid": database_runid,
+                    "fingerprint_qc": qc_status[row["left"]],
+                    "database_fingerprint_qc": qc_status[row["right"]],
                     "status": status,
                     "lod_score": row["lod_score"],
                     "lod_score_tumor_normal": row["lod_score_tumor_normal"],
@@ -478,6 +507,12 @@ def write_mqc_table(path, reported, summary, threshold):
         "        title: 'Database sample'",
         "    database_runid:",
         "        title: 'Database run'",
+        "    fingerprint_qc:",
+        "        title: 'QC'",
+        "        description: 'Fingerprint QC of the sample of this run'",
+        "    database_fingerprint_qc:",
+        "        title: 'Database QC'",
+        "        description: 'Fingerprint QC of the database fingerprint (NOT_RECORDED: added before the QC existed)'",
         "    status:",
         "        title: 'Status'",
         "    lod_score:",
@@ -550,6 +585,7 @@ def write_mqc_note(path, summary, threshold):
     )
 
 
+QC_LABELS = {"PASS": "label-success", "FAIL": "label-danger"}
 STATUS_LABELS = {
     "SUITABLE": "label-success",
     "INSUFFICIENT": "label-warning",
@@ -571,6 +607,10 @@ def overview_html(summary, fingerprint_rows, replaced, threshold):
             f"{summary['run_samples_suitable']} with a suitable fingerprint, "
             f"{summary['run_samples_insufficient']} insufficient, "
             f"{summary['run_samples_no_coverage']} without reads at the haplotype map SNPs."
+        ),
+        (
+            f"<strong>Fingerprint QC:</strong> {summary['run_samples_qc_pass']} PASS, "
+            f"{summary['run_samples_qc_fail']} FAIL (see Fingerprint QC)."
         ),
     ]
     if summary["database_given"]:
@@ -602,8 +642,10 @@ def overview_html(summary, fingerprint_rows, replaced, threshold):
         )
     items.append(
         f"<strong>Updated database:</strong> {e(summary['updated_database_file'])}, "
-        f"{summary['database_samples']} fingerprints. Use it as --fingerprint_database of the "
-        "next run."
+        f"{summary['database_samples']} fingerprints (fingerprint QC: "
+        f"{summary['database_qc_pass']} PASS, {summary['database_qc_fail']} FAIL, "
+        f"{summary['database_qc_not_recorded']} not recorded). Use it as "
+        "--fingerprint_database of the next run."
     )
     body = ["<ul>"] + [f"<li>{item}</li>" for item in items] + ["</ul>"]
     # one table row per sample of this run
@@ -611,7 +653,7 @@ def overview_html(summary, fingerprint_rows, replaced, threshold):
         '<table class="table table-condensed table-hover">',
         (
             "<thead><tr><th>Sample</th><th>Run</th><th>Haplotype blocks with reads</th>"
-            "<th>Mean depth</th><th>Self LOD</th><th>Fingerprint</th></tr></thead>"
+            "<th>Mean depth</th><th>Self LOD</th><th>Fingerprint</th><th>QC</th></tr></thead>"
         ),
         "<tbody>",
     ]
@@ -621,7 +663,8 @@ def overview_html(summary, fingerprint_rows, replaced, threshold):
             f"<tr><td>{e(row['sample'])}</td><td>{e(row['runid'])}</td>"
             f"<td>{row['blocks_with_reads']} / {row['haplotype_blocks']} ({fraction:.1%})</td>"
             f"<td>{row['mean_depth']}</td><td>{row['self_lod']}</td>"
-            f'<td><span class="label {STATUS_LABELS[row["status"]]}">{row["status"]}</span></td></tr>'
+            f'<td><span class="label {STATUS_LABELS[row["status"]]}">{row["status"]}</span></td>'
+            f'<td><span class="label {QC_LABELS[row["fingerprint_qc"]]}">{row["fingerprint_qc"]}</span></td></tr>'
         )
     body += ["</tbody>", "</table>"]
     body.append(
@@ -632,6 +675,192 @@ def overview_html(summary, fingerprint_rows, replaced, threshold):
         "any haplotype block.</p>"
     )
     return "\n".join(body) + "\n"
+
+
+def read_qc_summaries(paths, run_samples):
+    """Read the fingerprint QC summary of each sample of this run: {fingerprint_id: row}."""
+    summaries = {}
+    for path in paths:
+        with open(path, newline="") as handle:
+            reader = csv.DictReader(handle, delimiter="\t")
+            if reader.fieldnames != SUMMARY_COLUMNS:
+                fail(
+                    f"{path}: expected the columns of fingerprint_qc.py {SUMMARY_COLUMNS}, "
+                    f"observed {reader.fieldnames}"
+                )
+            rows = list(reader)
+        if len(rows) != 1:
+            fail(f"{path}: expected one QC summary row, observed {len(rows)}")
+        row = rows[0]
+        fingerprint_id = row["fingerprint_id"]
+        if fingerprint_id not in run_samples:
+            fail(f"{path}: fingerprint '{fingerprint_id}' is not a sample of this run")
+        if fingerprint_id in summaries:
+            fail(f"{path}: second QC summary of '{fingerprint_id}'")
+        if row["status"] not in ("PASS", "FAIL"):
+            fail(f"{path}: QC status must be PASS or FAIL, observed '{row['status']}'")
+        summaries[fingerprint_id] = row
+    missing = sorted(set(run_samples) - set(summaries))
+    if missing:
+        fail(
+            f"no fingerprint QC summary for sample(s) of this run: {', '.join(missing)}"
+        )
+    return summaries
+
+
+def read_database_qc(path, qc_summaries):
+    """QC status of every fingerprint of the updated database from its ##SAMPLE lines.
+
+    Every fingerprint needs exactly one line (written by
+    fingerprint_database_header.py); the lines of this run must agree with
+    its QC summaries.
+    """
+    lines = read_header(path)
+    samples = lines[-1].split("\t")[9:]
+    status = {}
+    for line in lines:
+        fingerprint_id = sample_id(line)
+        if fingerprint_id is None:
+            continue
+        values = parse_sample_line(line, path)
+        if fingerprint_id not in samples:
+            fail(
+                f"{path}: ##SAMPLE line of '{fingerprint_id}', which is not in the database"
+            )
+        if fingerprint_id in status:
+            fail(f"{path}: two ##SAMPLE lines of '{fingerprint_id}'")
+        value = values.get(SAMPLE_QC_KEY)
+        if value not in QC_STATUSES:
+            fail(
+                f"{path}: ##SAMPLE line of '{fingerprint_id}': {SAMPLE_QC_KEY} must be one of "
+                f"{QC_STATUSES}, observed '{value}'"
+            )
+        status[fingerprint_id] = value
+    missing = [f for f in samples if f not in status]
+    if missing:
+        fail(
+            f"{path}: no fingerprint QC (##SAMPLE) line for {len(missing)} fingerprint(s), e.g. "
+            f"{', '.join(missing[:5])}; the database header must be written by "
+            "fingerprint_database_header.py"
+        )
+    for fingerprint_id, row in qc_summaries.items():
+        if status[fingerprint_id] != row["status"]:
+            fail(
+                f"{path}: QC status of '{fingerprint_id}' is {status[fingerprint_id]} in the "
+                f"database, {row['status']} in its QC summary"
+            )
+    return status
+
+
+def qc_description(row):
+    """Description of the QC criteria with the thresholds of a QC summary row."""
+    return (
+        "Each haplotype site of the fingerprint (one SNP per haplotype block) passes if its "
+        f"depth (bases with base quality &ge; {row['min_base_quality']} and mapping quality "
+        f"&ge; {row['min_mapping_quality']}, each read once) is &ge; {row['min_site_depth']} "
+        f"and the mean base quality of its reads is &ge; {row['min_site_mean_base_quality']}. "
+        "Failed sites are masked (flat genotype likelihoods) and do not count in fingerprint "
+        "comparisons. A sample passes if the fraction of passing sites is &ge; "
+        f"{row['min_fraction_passing_sites']} and its estimated contamination (maximum "
+        "likelihood from the passing sites and the allele frequencies of the haplotype map) is "
+        f"&le; {row['max_contamination']}. Status, thresholds and values are stored with each "
+        "fingerprint in the database (##SAMPLE header line)."
+    )
+
+
+def mqc_value(value):
+    """Empty cell for a missing value, so MultiQC treats it as missing."""
+    return "" if value == "." else value
+
+
+def write_qc_mqc_table(path, qc_summaries):
+    """Write the fingerprint QC of this run as MultiQC custom content table."""
+    rows = [qc_summaries[f] for f in sorted(qc_summaries)]
+    header = [
+        f"id: {yaml_quote(MQC_QC_ID)}",
+        f"section_name: {yaml_quote('Fingerprint QC')}",
+        f"description: {yaml_quote(qc_description(rows[0]))}",
+        "plot_type: 'table'",
+        "pconfig:",
+        f"    id: {yaml_quote(MQC_QC_ID + '_table')}",
+        f"    title: {yaml_quote('ExomeQC: fingerprint QC')}",
+        f"    col1_header: {yaml_quote('Fingerprint')}",
+        "headers:",
+        "    status:",
+        "        title: 'QC'",
+        "        description: 'Fingerprint QC status of the sample'",
+        "        cond_formatting_rules:",
+        "            pass: [{s_eq: 'PASS'}]",
+        "            fail: [{s_eq: 'FAIL'}]",
+        "        cond_formatting_colours:",
+        "            - pass: '#5cb85c'",
+        "            - fail: '#d9534f'",
+        "    failed_criteria:",
+        "        title: 'Failed criteria'",
+        "        description: 'Sample criteria not met (FractionPassingSites, Contamination)'",
+        "    passing_sites:",
+        "        title: 'Passing sites'",
+        "        description: 'Haplotype sites that pass the depth and base quality thresholds'",
+        "        format: '{:,.0f}'",
+        "    haplotype_sites:",
+        "        title: 'Sites'",
+        "        description: 'Haplotype sites of the fingerprint (one SNP per haplotype block)'",
+        "        format: '{:,.0f}'",
+        "    fraction_passing_sites:",
+        "        title: 'Fraction passing'",
+        f"        description: {yaml_quote('Fraction of passing sites; minimum ' + rows[0]['min_fraction_passing_sites'])}",
+        "        format: '{:,.3f}'",
+        "        min: 0",
+        "        max: 1",
+        "    sites_low_depth:",
+        "        title: 'Low depth'",
+        f"        description: {yaml_quote('Sites with depth below ' + rows[0]['min_site_depth'])}",
+        "        format: '{:,.0f}'",
+        "    sites_low_base_quality:",
+        "        title: 'Low base quality'",
+        f"        description: {yaml_quote('Sites with mean base quality below ' + rows[0]['min_site_mean_base_quality'])}",
+        "        format: '{:,.0f}'",
+        "    mean_site_depth:",
+        "        title: 'Mean depth'",
+        "        description: 'Mean depth of all haplotype sites (bases above the quality thresholds)'",
+        "        format: '{:,.1f}'",
+        "    mean_site_base_quality:",
+        "        title: 'Mean base quality'",
+        "        description: 'Mean of the mean base quality of the sites with reads'",
+        "        format: '{:,.1f}'",
+        "    contamination:",
+        "        title: 'Contamination'",
+        f"        description: {yaml_quote('Estimated fraction of reads from another person; maximum ' + rows[0]['max_contamination'])}",
+        "        format: '{:,.4f}'",
+        "        min: 0",
+        "    contamination_sites:",
+        "        title: 'Contamination sites'",
+        "        description: 'Passing sites used for the contamination estimate'",
+        "        format: '{:,.0f}'",
+        "        hidden: true",
+    ]
+    for column in SUMMARY_COLUMNS:
+        if column.startswith(("min_", "max_")) or column in (
+            "qc_date",
+            "exomeqc_version",
+            "sites_no_likelihoods",
+        ):
+            header += [
+                f"    {column}:",
+                f"        title: {yaml_quote(column)}",
+                "        hidden: true",
+            ]
+    columns = [
+        c for c in SUMMARY_COLUMNS if c not in ("fingerprint_id", "sample", "runid")
+    ]
+    with open(path, "w", newline="") as handle:
+        handle.writelines(f"# {line}\n" for line in header)
+        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+        writer.writerow(["fingerprint_id"] + columns)
+        for row in rows:
+            writer.writerow(
+                [row["fingerprint_id"]] + [mqc_value(row[c]) for c in columns]
+            )
 
 
 def parse_args(argv):
@@ -682,6 +911,13 @@ def parse_args(argv):
         help="CrosscheckFingerprints metrics of this run against the kept database fingerprints",
     )
     parser.add_argument(
+        "--qc-summaries",
+        required=True,
+        nargs="+",
+        type=Path,
+        help="fingerprint QC summaries of this run's samples (fingerprint_qc.py)",
+    )
+    parser.add_argument(
         "--lod-threshold", required=True, type=float, help="LOD threshold T (> 0)"
     )
     parser.add_argument(
@@ -714,6 +950,9 @@ def main(argv=None):
     fingerprint_rows = build_fingerprint_rows(
         run_samples, coverage, self_lods, args.lod_threshold
     )
+    qc_summaries = read_qc_summaries(args.qc_summaries, run_samples)
+    for row in fingerprint_rows:
+        row["fingerprint_qc"] = qc_summaries[row["fingerprint_id"]]["status"]
 
     kept, replaced, check = [], [], {}
     if args.database_samples:
@@ -737,12 +976,14 @@ def main(argv=None):
             f"--crosscheck must be given exactly when the database has kept fingerprints "
             f"({len(kept)} kept, crosscheck {'given' if args.crosscheck else 'not given'})"
         )
+    # QC status of every fingerprint, from the header of the updated database
+    qc_status = read_database_qc(args.database, qc_summaries)
     rows = []
     if args.crosscheck:
         rows = read_crosscheck_metrics(args.crosscheck)
         check_comparisons(rows, run_samples, set(kept), args.crosscheck)
     reported, counts, unreported_inconclusive = build_report(
-        rows, run_samples, args.lod_threshold
+        rows, run_samples, args.lod_threshold, qc_status
     )
 
     statuses = [row["status"] for row in fingerprint_rows]
@@ -755,6 +996,15 @@ def main(argv=None):
         "run_samples_suitable": statuses.count("SUITABLE"),
         "run_samples_insufficient": statuses.count("INSUFFICIENT"),
         "run_samples_no_coverage": statuses.count("NO_COVERAGE"),
+        "run_samples_qc_pass": sum(
+            r["status"] == "PASS" for r in qc_summaries.values()
+        ),
+        "run_samples_qc_fail": sum(
+            r["status"] == "FAIL" for r in qc_summaries.values()
+        ),
+        "database_qc_pass": list(qc_status.values()).count("PASS"),
+        "database_qc_fail": list(qc_status.values()).count("FAIL"),
+        "database_qc_not_recorded": list(qc_status.values()).count(NOT_RECORDED),
         "database_given": bool(args.database_samples),
         "database_file": check.get("database_file", ""),
         "database_compression": check.get("database_compression", ""),
@@ -784,6 +1034,12 @@ def main(argv=None):
         FINGERPRINT_COLUMNS,
         [[row[c] for c in FINGERPRINT_COLUMNS] for row in fingerprint_rows],
     )
+    write_tsv(
+        f"{args.prefix}_qc.tsv",
+        SUMMARY_COLUMNS,
+        [[qc_summaries[f][c] for c in SUMMARY_COLUMNS] for f in sorted(qc_summaries)],
+    )
+    write_qc_mqc_table(f"{args.prefix}_qc_mqc.tsv", qc_summaries)
     write_tsv(
         f"{args.prefix}_summary.tsv",
         ["metric", "value"],
@@ -823,6 +1079,15 @@ def main(argv=None):
                 f"< {args.lod_threshold:g}, {row['blocks_with_reads']} of "
                 f"{row['haplotype_blocks']} haplotype blocks with reads); its comparisons can "
                 "not reach a match"
+            )
+    for fingerprint_id in sorted(qc_summaries):
+        row = qc_summaries[fingerprint_id]
+        if row["status"] == "FAIL":
+            warning(
+                f"{fingerprint_id}: fingerprint QC FAIL ({row['failed_criteria']}): "
+                f"{row['passing_sites']} of {row['haplotype_sites']} haplotype sites pass "
+                f"(minimum fraction {row['min_fraction_passing_sites']}), contamination "
+                f"{row['contamination']} (maximum {row['max_contamination']})"
             )
     if replaced:
         warning(

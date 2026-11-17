@@ -1,0 +1,107 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "fingerprint_qc"
+description: |
+  Quality control of one sample's fingerprint: each fingerprint site must
+  reach adjustable thresholds of depth and base quality (bases counted with
+  base and mapping quality thresholds, each read name once), the sample's
+  contamination is estimated by maximum likelihood from the allele
+  frequencies of the haplotype map, and the sample passes with enough
+  passing sites and low contamination. Writes the site table and header
+  lines for bcftools annotate (FORMAT/FT, FPDP, FPAD, FPBQ; flat PL at failed
+  sites; ##SAMPLE line with status, thresholds and values) and a summary.
+keywords:
+  - fingerprint
+  - contamination
+  - qc
+  - vcf
+tools:
+  - "fingerprint_qc.py":
+      description: "exomeqc script (bin/) for the QC of a fingerprint from a samtools mpileup"
+      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
+      licence: ["MIT"]
+      identifier: ""
+input:
+  - - meta:
+        type: map
+        description: Sample metadata map with fingerprint_id <sample>@<runid>, e.g. `[ id:'SYN001_3-N', runid:'...', fingerprint_id:'SYN001_3-N@...' ]`
+    - fingerprint:
+        type: file
+        description: Fingerprint VCF of the sample (Picard ExtractFingerprint)
+        pattern: "*.vcf.gz"
+    - pileup:
+        type: file
+        description: samtools mpileup of the sample's BAM at the haplotype map SNPs, with --output-MQ --output-QNAME (plain or gzip)
+        pattern: "*.{mpileup,mpileup.gz}"
+  - haplotype_map:
+      type: file
+      description: Picard haplotype map (text format) with MAF column
+      pattern: "*.txt"
+output:
+  sites:
+    - - meta:
+          type: map
+          description: Sample metadata map
+      - "*_sites.tsv":
+          type: file
+          description: One row per fingerprint site with QC filter (FT), depth (FPDP), allele depths (FPAD), mean base quality (FPBQ) and PL for bcftools annotate
+          pattern: "*_sites.tsv"
+  header:
+    - - meta:
+          type: map
+          description: Sample metadata map
+      - "*_header.txt":
+          type: file
+          description: VCF header lines: FORMAT and FILTER definitions and the ##SAMPLE QC line
+          pattern: "*_header.txt"
+  summary:
+    - - meta:
+          type: map
+          description: Sample metadata map
+      - "*_summary.tsv":
+          type: file
+          description: QC summary of the sample: status, failed criteria, thresholds and values (one row)
+          pattern: "*_summary.tsv"
+  versions_python:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - python:
+          type: string
+          description: The name of the tool
+      - python3 --version | sed 's/Python //':
+          type: eval
+          description: The expression to obtain the version of the tool
+  versions_pyvcf3:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - pyvcf3:
+          type: string
+          description: The name of the tool
+      - python3 -c 'import vcf; print(vcf.VERSION)':
+          type: eval
+          description: The expression to obtain the version of the tool
+topics:
+  versions:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - python:
+          type: string
+          description: The name of the tool
+      - python3 --version | sed 's/Python //':
+          type: eval
+          description: The expression to obtain the version of the tool
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - pyvcf3:
+          type: string
+          description: The name of the tool
+      - python3 -c 'import vcf; print(vcf.VERSION)':
+          type: eval
+          description: The expression to obtain the version of the tool
+authors:
+  - "@kai"
+maintainers:
+  - "@kai"

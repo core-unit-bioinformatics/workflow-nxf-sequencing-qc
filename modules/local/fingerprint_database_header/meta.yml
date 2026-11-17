@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "fingerprint_database_header"
+description: |
+  Write the VCF header of the merged fingerprint database with exactly one
+  ##SAMPLE fingerprint QC line per fingerprint: this run's new QC lines,
+  the QC lines of earlier fingerprints from the database, and
+  ExomeqcFingerprintQC=NOT_RECORDED for fingerprints added before the QC
+  existed. Outdated lines of replaced or removed fingerprints are dropped.
+  The header is applied with bcftools reheader.
+keywords:
+  - fingerprint
+  - vcf
+  - header
+  - qc
+tools:
+  - "fingerprint_database_header.py":
+      description: "exomeqc script (bin/) that writes the fingerprint database header"
+      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
+      licence: ["MIT"]
+      identifier: ""
+input:
+  - - meta:
+        type: map
+        description: Database metadata map, e.g. `[ id:'exomeqc_fingerprint_database_20260101-120000' ]`
+    - database:
+        type: file
+        description: Merged fingerprint database (bgzip VCF)
+        pattern: "*.vcf.gz"
+  - run_qc_headers:
+      type: file
+      description: QC header line files of this run's fingerprints (fingerprint_qc)
+      pattern: "*_header.txt"
+output:
+  header:
+    - - meta:
+          type: map
+          description: Database metadata map
+      - "*_header.txt":
+          type: file
+          description: Complete VCF header for bcftools reheader
+          pattern: "*_header.txt"
+  versions_python:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - python:
+          type: string
+          description: The name of the tool
+      - python3 --version | sed 's/Python //':
+          type: eval
+          description: The expression to obtain the version of the tool
+  versions_pyvcf3:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - pyvcf3:
+          type: string
+          description: The name of the tool
+      - python3 -c 'import vcf; print(vcf.VERSION)':
+          type: eval
+          description: The expression to obtain the version of the tool
+topics:
+  versions:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - python:
+          type: string
+          description: The name of the tool
+      - python3 --version | sed 's/Python //':
+          type: eval
+          description: The expression to obtain the version of the tool
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - pyvcf3:
+          type: string
+          description: The name of the tool
+      - python3 -c 'import vcf; print(vcf.VERSION)':
+          type: eval
+          description: The expression to obtain the version of the tool
+authors:
+  - "@kai"
+maintainers:
+  - "@kai"
