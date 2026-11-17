@@ -43,7 +43,9 @@ nextflow_pipeline {
                 { assert multiqc_files.contains('20261023_LH00001_0001_ATEST_data') },
                 { assert !multiqc_files.any { name -> name.endsWith('multiqc_report.html') } },
                 // the title is still printed in the report
-                { assert path("${outputDir}/results/multiqc/20261023_LH00001_0001_ATEST.html").text.contains('Exome Sequencing') }
+                { assert path("${outputDir}/results/multiqc/20261023_LH00001_0001_ATEST.html").text.contains('Exome Sequencing') },
+                // top-level names in multiqc/ (report content is not stable)
+                { assert snapshot(multiqc_files).match() }
             )
         }
     }
@@ -73,9 +75,12 @@ nextflow_pipeline {
         }
 
         then {
+            def multiqc_files = new File("${outputDir}/results/multiqc").list().sort()
             assertAll(
                 { assert workflow.success },
-                { assert new File("${outputDir}/results/multiqc/Exome-Sequencing_multiqc_report.html").exists() }
+                { assert new File("${outputDir}/results/multiqc/Exome-Sequencing_multiqc_report.html").exists() },
+                // top-level names in multiqc/ (report content is not stable)
+                { assert snapshot(multiqc_files).match() }
             )
         }
     }
