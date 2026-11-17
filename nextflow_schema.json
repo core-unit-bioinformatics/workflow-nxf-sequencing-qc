@@ -142,7 +142,7 @@
                 "vaf_histogram_include_filtered": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Also count variants whose FILTER is not PASS. Default: only PASS variants."
+                    "description": "Also count variants whose FILTER is not PASS or `.`. Default: only PASS variants and variants with FILTER `.` (no filters applied)."
                 }
             }
         },

@@ -147,6 +147,7 @@ def test_three_callers_auto(tmp_path):
     assert summary[0] == [
         "sample", "vcf_sample", "vcf", "vaf_source",
         "records_read", "records_filtered", "alleles_counted", "alleles_non_variant",
+        "alleles_not_in_genotype", "records_filter_missing",
     ]  # fmt: skip
     assert rows["VAFT01"][1:] == [
         "VAFT01-T",
@@ -155,6 +156,8 @@ def test_three_callers_auto(tmp_path):
         "6",
         "1",
         "6",
+        "0",
+        "0",
         "0",
     ]
     assert rows["VAFT02"][3] == "FORMAT_AF"
@@ -166,6 +169,8 @@ def test_three_callers_auto(tmp_path):
         "1",
         "5",
         "0",
+        "0",
+        "0",
     ]
     assert [d["name"] for d in mqc["pconfig"]["data_labels"]] == [
         "VAFG03",
@@ -176,9 +181,12 @@ def test_three_callers_auto(tmp_path):
 
 
 def test_all_columns_are_named_sample_column(tmp_path):
-    tsv, _, mqc = run(tmp_path, "--input", "VAFT01", str(DRAGEN))
+    tsv, summary, mqc = run(tmp_path, "--input", "VAFT01", str(DRAGEN))
     assert {row[0] for row in tsv[1:]} == {"VAFT01_VAFT01-N", "VAFT01_VAFT01-T"}
-    assert nonzero(tsv, "VAFT01_VAFT01-N") == {"0.00": 6}
+    # the normal column carries no ALT allele (GT 0/0): empty histogram, skips counted
+    assert nonzero(tsv, "VAFT01_VAFT01-N") == {}
+    assert summary[1][0] == "VAFT01_VAFT01-N"
+    assert summary[1][6:] == ["0", "0", "6", "0"]
     assert len(mqc["data"]) == 2
 
 
@@ -264,7 +272,7 @@ def test_non_variant_alt_needs_no_vaf(tmp_path):
     )
     tsv, summary, _ = run(tmp_path, "--input", "S1", str(vcf), "--sample-regex=-T$")
     assert nonzero(tsv, "S1") == {"0.40": 1}
-    assert summary[1][4:] == ["2", "0", "1", "1"]
+    assert summary[1][4:] == ["2", "0", "1", "1", "0", "0"]
 
 
 # --- errors ------------------------------------------------------------------
@@ -394,7 +402,7 @@ def test_filtered_record_without_value_is_no_error(tmp_path):
         columns=("S1",),
     )
     _, summary, _ = run(tmp_path, "--input", "S1", str(vcf))
-    assert summary[1][4:] == ["1", "1", "0", "0"]
+    assert summary[1][4:] == ["1", "1", "0", "0", "0", "0"]
 
 
 def test_error_af_count_mismatch(tmp_path, capsys):
@@ -555,3 +563,77 @@ def test_error_duplicate_histogram_name(tmp_path, capsys):
         ],
         "histogram name 'VAFT01_VAFT01-T' occurs twice",
     )
+
+
+# --- genotype, FILTER '.', multi-allelic ---------------------------------------
+
+
+def test_joint_called_counts_only_alleles_in_genotype(tmp_path):
+    # joint-called germline VCF: S2 is hom-ref at 10 and has a no-call ('.') at 20
+    vcf = write_vcf(
+        tmp_path / "joint.vcf",
+        ["GT", "AD", "DP"],
+        "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AD:DP\t0/1:5,5:10\t0/0:10,0:10\n"
+        "chr1\t20\t.\tA\tC,G\t.\tPASS\t.\tGT:AD:DP\t0/2:6,0,4:10\t.\n",
+        columns=("S1", "S2"),
+    )
+    tsv, summary, _ = run(tmp_path, "--input", "J", str(vcf))
+    # S1: allele C at 10 (0.5) and allele G at 20 (0.4); allele C at 20 not in GT
+    assert nonzero(tsv, "J_S1") == {"0.50": 1, "0.40": 1}
+    assert nonzero(tsv, "J_S2") == {}
+    rows = {row[0]: row for row in summary[1:]}
+    assert rows["J_S1"][6:] == ["2", "0", "1", "0"]
+    assert rows["J_S2"][6:] == ["0", "0", "3", "0"]
+
+
+def test_star_allele_without_value_is_no_error(tmp_path):
+    # the '*' allele has no AF; only the carried ALT allele needs one
+    vcf = write_vcf(
+        tmp_path / "star.vcf",
+        ["GT", "AF"],
+        "chr1\t10\t.\tA\tC,*\t.\tPASS\t.\tGT:AF\t1/2:0.4,.\n",
+        columns=("S1",),
+    )
+    tsv, summary, _ = run(tmp_path, "--input", "S1", str(vcf))
+    assert nonzero(tsv, "S1") == {"0.40": 1}
+    assert summary[1][4:] == ["1", "0", "1", "1", "0", "0"]
+
+
+def test_without_gt_all_alleles_are_counted(tmp_path):
+    vcf = write_vcf(
+        tmp_path / "nogt.vcf",
+        ["AF"],
+        "chr1\t10\t.\tA\tC,G\t.\tPASS\t.\tAF\t0.2,0.3\n",
+        columns=("S1",),
+    )
+    tsv, _, _ = run(tmp_path, "--input", "S1", str(vcf))
+    assert nonzero(tsv, "S1") == {"0.20": 1, "0.30": 1}
+
+
+def test_error_bad_genotype(tmp_path, capsys):
+    vcf = write_vcf(
+        tmp_path / "bad.vcf",
+        ["GT", "AF"],
+        "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF\t0/2:0.4\n",
+        columns=("S1",),
+    )
+    expect_error(
+        capsys,
+        ["--input", "S1", str(vcf), "--prefix", str(tmp_path / "o")],
+        "GT '0/2' has allele '2', expected 0..1 or '.'",
+    )
+
+
+def test_filter_missing_is_counted_and_logged(tmp_path, capsys):
+    # FILTER '.' (no filters applied, e.g. FreeBayes) is counted like PASS
+    vcf = write_vcf(
+        tmp_path / "fb.vcf",
+        ["GT", "AD", "DP"],
+        "chr1\t10\t.\tA\tC\t.\t.\t.\tGT:AD:DP\t0/1:5,5:10\n"
+        "chr1\t20\t.\tA\tC\t.\tLowQual\t.\tGT:AD:DP\t0/1:8,2:10\n",
+        columns=("S1",),
+    )
+    tsv, summary, _ = run(tmp_path, "--input", "S1", str(vcf))
+    assert nonzero(tsv, "S1") == {"0.50": 1}
+    assert summary[1][4:] == ["2", "1", "1", "0", "0", "1"]
+    assert "1 record(s) with FILTER '.'" in capsys.readouterr().err
