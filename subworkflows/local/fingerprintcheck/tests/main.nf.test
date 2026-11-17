@@ -51,10 +51,14 @@ nextflow_workflow {
             def fingerprints = path(workflow.out.database_fingerprints[0][1]).readLines()
             // the summary names the timestamped database; drop that line for the snapshot
             def summary = path(workflow.out.database_summary[0][1]).readLines().findAll { line -> !line.startsWith('updated_database_file') }
+            def match_columns = matches[0].split('\t') as List
+            def database_header = path(database.toString()).linesGzip.takeWhile { line -> line.startsWith('#') }
+            def qc_lines = database_header.findAll { line -> line.startsWith('##SAMPLE=') }
+            def qc_report = path(workflow.out.fingerprint_qc_report[0][1]).readLines()
             assertAll(
                 { assert workflow.success },
                 // the three cases of the fixture design, unexpected results first
-                { assert matches.collect { line -> line.split('\t')[[0, 1, 2, 3, 4]].join(' ') } == [
+                { assert matches.collect { line -> line.split('\t')[['sample', 'runid', 'database_sample', 'database_runid', 'status'].collect { name -> match_columns.indexOf(name) }].join(' ') } == [
                     'sample runid database_sample database_runid status',
                     'SYN003_1-T 20260201_LH00001_0002_BFIXTURE02 SYN001_3-N 20260101_LH00001_0001_AFIXTURE01 UNEXPECTED_MATCH',
                     'SYN002_1-T 20260201_LH00001_0002_BFIXTURE02 SYN002_1-T 20260101_LH00001_0001_AFIXTURE01 UNEXPECTED_MISMATCH',
@@ -80,10 +84,21 @@ nextflow_workflow {
                 { assert check.contains('kept_fingerprints\t2') },
                 // every sample of run B gave a suitable fingerprint
                 { assert fingerprints.size() == 5 },
-                { assert fingerprints[1..-1].every { line -> line.endsWith('\tSUITABLE') } },
+                { assert fingerprints[1..-1].every { line -> line.endsWith('\tSUITABLE\tPASS') } },
+                // fingerprint QC: every sample of run B passes (synthetic reads without errors or contamination)
+                { assert workflow.out.fingerprint_qc.size() == 4 },
+                { assert qc_report.size() == 5 },
+                { assert qc_report[1..-1].every { line -> line.split('\t')[3] == 'PASS' } },
+                // one QC line per database fingerprint: run B with status, thresholds and values;
+                // run A was added before the QC existed
+                { assert qc_lines.size() == 6 },
+                { assert qc_lines.count { line -> line.contains('@20260201_LH00001_0002_BFIXTURE02,ExomeqcFingerprintQC=PASS,') && line.contains(',MinSiteDepth=10,') && line.contains(',MaxContamination=0.03>') } == 4 },
+                { assert qc_lines.count { line -> line.endsWith('@20260101_LH00001_0001_AFIXTURE01,ExomeqcFingerprintQC=NOT_RECORDED>') } == 2 },
+                // the site QC is in the fingerprints
+                { assert workflow.out.fingerprints.every { row -> path(row[1]).linesGzip.findAll { line -> !line.startsWith('#') }.every { line -> line.split('\t')[8] == 'AD:DP:PL:FT:FPDP:FPAD:FPBQ' } } },
                 // the cohort crosscheck covers all four BAMs, including the aligned one: 4 x 4 comparisons
                 { assert path(workflow.out.crosscheck_metrics[0][1]).readLines().findAll { line -> line.contains('\tFILE\t') }.size() == 16 },
-                { assert workflow.out.database_multiqc.collect { row -> file(row[1]).name }.sort() == [ 'fingerprint_database_matches_mqc.tsv', 'fingerprint_database_overview_mqc.html' ] },
+                { assert workflow.out.database_multiqc.collect { row -> file(row[1]).name }.sort() == [ 'fingerprint_database_matches_mqc.tsv', 'fingerprint_database_overview_mqc.html', 'fingerprint_database_qc_mqc.tsv' ] },
                 { assert workflow.out.fingerprints.collect { row -> file(row[1]).name }.sort() == [
                     'SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz',
                     'SYN002_1-T_20260201_LH00001_0002_BFIXTURE02.fingerprint.vcf.gz',
@@ -95,6 +110,8 @@ nextflow_workflow {
                     workflow.out.database_fingerprints,
                     workflow.out.database_check,
                     summary,
+                    // QC summaries without the date of the run
+                    workflow.out.fingerprint_qc.sort { row -> file(row[1]).name }.collect { row -> path(row[1]).readLines().collect { line -> line.split('\t').toList().withIndex().findAll { _v, i -> i != 5 }.collect { v, _i -> v }.join('\t') } },
                     // genotype data of the fingerprints (header lines carry dates and paths)
                     workflow.out.fingerprints.sort { row -> file(row[1]).name }.collect { row -> path(row[1]).linesGzip.findAll { line -> !line.startsWith('##') } }
                 ).match() }
