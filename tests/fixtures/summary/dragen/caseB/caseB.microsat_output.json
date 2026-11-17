@@ -1,0 +1,11 @@
+{
+  "Settings": {
+    "NormalMode": "PairedNormal",
+    "MinimumCoverage": 60
+  },
+  "TotalMicrosatelliteSitesAssessed": 2104,
+  "TotalMicrosatelliteSitesUnstable": 610,
+  "PercentageUnstableSites": 28.99,
+  "SumJsd": 190.7,
+  "ResultIsValid": true
+}

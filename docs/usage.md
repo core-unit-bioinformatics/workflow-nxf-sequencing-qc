@@ -194,6 +194,27 @@ To name the MultiQC report after the run, add e.g.:
 
 The report is then written to `<OUTDIR>/multiqc/20261023_LH00001_0001_AHXXXXXXX.html`. The name may contain `A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, must start with a letter or digit and must not end in `.html`; other names stop the pipeline at parameter validation. `--multiqc_title` still sets the title printed in the report.
 
+### Report summary
+
+With `--dragen_dirs` set, the MultiQC report starts with a compact **Summary** section (`--enable_summary`, default `true`): one row per DRAGEN case with CNV QC status, purity, ploidy, TMB, MSI and HRD, plus run-level chips for CNV QC and fingerprint results. All further values are in collapsed `<details>` blocks below the table.
+
+| Parameter          | Default | Description                                                                    |
+| ------------------ | ------- | ------------------------------------------------------------------------------ |
+| `enable_summary`   | `true`  | Add the summary section. Skipped with a warning if `--dragen_dirs` is not set. |
+| `summary_tmb_high` | unset   | Highlight TMB (mut/Mb) at or above this value.                                 |
+| `summary_msi_high` | unset   | Highlight MSI (% unstable sites) at or above this value.                       |
+| `summary_hrd_high` | unset   | Highlight HRD sum (LOH + TAI + LST) at or above this value.                    |
+
+The pipeline ships no clinical cutoffs: without a `summary_*_high` value the numbers are shown without highlighting. Set your lab's validated cutoffs in a params file.
+
+Input requirements (searched recursively in all `--dragen_dirs`, case = file prefix):
+
+- `<case>.tmb.metrics.csv` (DRAGEN TMB, must contain a `TMB` metric)
+- `<case>.microsat_output.json` (DRAGEN MSI, must contain `PercentageUnstableSites`; `ResultIsValid: false` is shown as `(invalid)` and never highlighted)
+- `<case>.hrdscore.csv` (DRAGEN HRD, exactly one data row with `HRD_sum`)
+
+A case found twice across `--dragen_dirs`, or a malformed file, stops the pipeline with an error naming the file. A case with only some of the files is shown with `n/a` and listed under "Incomplete cases". Tested with synthetic files modelled on DRAGEN output (`tests/fixtures/summary/`); not yet with a real DRAGEN run.
+
 This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.
 
 Note that the pipeline will create the following files in your working directory:

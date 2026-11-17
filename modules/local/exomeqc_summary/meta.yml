@@ -1,0 +1,51 @@
+name: "exomeqc_summary"
+description: >-
+  Compact per-case summary (CNV QC, purity, ploidy, TMB, MSI, HRD) and
+  run-level fingerprint status for the top of the MultiQC report.
+keywords:
+  - summary
+  - biomarker
+  - tmb
+  - msi
+  - hrd
+  - multiqc
+tools:
+  - "exomeqc_summary.py":
+      description: "Pipeline script in bin/ combining DRAGEN biomarkers with QC results."
+      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
+      licence: ["MIT"]
+input:
+  - dragen_dirs:
+      type: directory
+      description: >-
+        DRAGEN output directories; searched recursively for
+        *.tmb.metrics.csv, *.microsat_output.json and *.hrdscore.csv.
+  - cnv_metrics:
+      type: file
+      description: cnv-metrics.csv from DRAGEN_CNV_QC (optional, pass [] to skip).
+      pattern: "*.csv"
+  - crosscheck:
+      type: file
+      description: Picard CrosscheckFingerprints metrics (optional, pass [] to skip).
+      pattern: "*.crosscheck_metrics.txt"
+output:
+  - multiqc_config:
+      - "*exomeqc_summary_multiqc_config.yml":
+          type: file
+          description: >-
+            MultiQC config setting intro_text to the summary, so it is shown
+            right below the report title (above General Statistics).
+  - html:
+      - "*exomeqc_summary.html":
+          type: file
+          description: The summary HTML fragment, standalone.
+  - tsv:
+      - "*exomeqc_summary.tsv":
+          type: file
+          description: Compact summary, one row per case.
+  - biomarker:
+      - "*biomarker.tsv":
+          type: file
+          description: All TMB/MSI/HRD values per case (columns as diag biomarker.csv).
+authors:
+  - "Core Unit Bioinformatics, HHU"

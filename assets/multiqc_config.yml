@@ -16,6 +16,32 @@ custom_data:
       title: CNV QC Metrics
       col1_header: Sample
       sort_rows: true
+      # columns listed under 'headers' come first, in this order; all other
+      # columns follow in file order
+      only_defined_headers: false
+    headers:
+      QC_STATUS: {}
+      QC_FAIL_REASONS: {}
+      NORMAL_SEX: {}
+      TUMOR_SEX: {}
+      EstimatedTumorPurity:
+        title: Tumor purity
+        description: DRAGEN EstimatedTumorPurity
+        format: '{:,.0%}'
+        min: 0
+        max: 1
+        scale: RdYlGn
+      PMAD:
+        format: '{:,.3f}'
+      Coverage MAD:
+        format: '{:,.3f}'
+      DiploidCoverage:
+        format: '{:,.1f}'
+      HomozygosityIndex:
+        format: '{:,.3f}'
+      OutlierBafFraction:
+        format: '{:,.3f}'
+      ModelSource: {}
   exomeqc_purcov_maxmodel:
     section_name: "CNV: Purity/Coverage Model"
     description: >-

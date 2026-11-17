@@ -259,6 +259,11 @@ write_plain_csv <- function(df, outfile) {
     ordered_cols <- c("sample", setdiff(names(df), "sample"))
     df <- df[, ordered_cols, drop = FALSE]
   }
+  # Store numeric-looking text (e.g. VCF header metrics) as numbers, so that
+  # write.csv does not quote it; MultiQC treats quoted values as strings.
+  df[] <- lapply(df, function(x) {
+    if (is.character(x)) utils::type.convert(x, as.is = TRUE) else x
+  })
   utils::write.csv(df, file = outfile, row.names = FALSE, quote = TRUE)
 }
 
@@ -926,6 +931,17 @@ run_self_tests <- function() {
   )
 
   qc <- evaluate_qc_status(mock, parse_thresholds(list(pmad_max = "0.2")))
+  # write_plain_csv: 'sample' first, numeric text unquoted (MultiQC parses
+  # quoted values as strings and draws no bars for them)
+  tmp_csv <- tempfile(fileext = ".csv")
+  write_plain_csv(
+    data.frame(QC_STATUS = "PASS", sample = "S1", PMAD = "0.1", NORMAL_SEX = "XX",
+               EstimatedTumorPurity = NA_character_, stringsAsFactors = FALSE),
+    tmp_csv
+  )
+  csv_lines <- readLines(tmp_csv)
+  stopifnot(identical(csv_lines[1], '"sample","QC_STATUS","PMAD","NORMAL_SEX","EstimatedTumorPurity"'))
+  stopifnot(identical(csv_lines[2], '"S1","PASS",0.1,"XX",NA'))
   stopifnot(qc$QC_STATUS[qc$sample == "S1"] == "PASS")
   stopifnot(qc$QC_STATUS[qc$sample == "S2"] == "FAIL")
   stopifnot(qc$QC_STATUS[qc$sample == "S3"] == "FAIL")

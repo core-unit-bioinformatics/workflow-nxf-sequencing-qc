@@ -1,0 +1,66 @@
+{
+    "synthetic dragen + cnv + fingerprint": {
+        "content": [
+            [
+                "exomeqc_summary.tsv:md5,dd082f6a6949668459ecea8c4b818845"
+            ],
+            [
+                "biomarker.tsv:md5,9c2aca150e594eff565e6cf84fa72ec5"
+            ],
+            {
+                "versions_python": [
+                    [
+                        "EXOMEQC_SUMMARY",
+                        "python",
+                        "3.9.23"
+                    ]
+                ],
+                "versions_script": [
+                    [
+                        "EXOMEQC_SUMMARY",
+                        "exomeqc_summary.py",
+                        "1.0.0"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-11-17T17:32:25.406928714",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "synthetic dragen - stub": {
+        "content": [
+            [
+                "exomeqc_summary.html:md5,d41d8cd98f00b204e9800998ecf8427e"
+            ],
+            [
+                "exomeqc_summary.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+            ],
+            [
+                "biomarker.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+            ]
+        ],
+        "timestamp": "2026-11-17T15:18:44.649558899",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "synthetic dragen only": {
+        "content": [
+            [
+                "exomeqc_summary.tsv:md5,f71dd30446700d246ad6de2684a826c2"
+            ],
+            [
+                "biomarker.tsv:md5,9c2aca150e594eff565e6cf84fa72ec5"
+            ]
+        ],
+        "timestamp": "2026-11-17T15:17:56.627409493",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}
