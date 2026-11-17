@@ -1,0 +1,8 @@
+# CrosscheckFingerprints synthetic
+
+LEFT_GROUP_VALUE	RESULT	DATA_TYPE	LOD_SCORE	RIGHT_GROUP_VALUE
+/x/caseA_tumor.bam	EXPECTED_MATCH	FILE	50.1	/x/caseA_tumor.bam
+/x/caseA_tumor.bam	UNEXPECTED_MATCH	FILE	40.2	/x/caseA_normal.bam
+/x/caseA_normal.bam	UNEXPECTED_MATCH	FILE	40.2	/x/caseA_tumor.bam
+/x/caseA_tumor.bam	EXPECTED_MISMATCH	FILE	-30.0	/x/caseB_tumor.bam
+/x/caseB_tumor.bam	INCONCLUSIVE	FILE	1.2	/x/caseB_normal.bam

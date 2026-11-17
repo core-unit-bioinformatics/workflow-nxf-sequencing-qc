@@ -1,0 +1,79 @@
+nextflow_process {
+
+    name "Test Process EXOMEQC_SUMMARY"
+    script "../main.nf"
+    process "EXOMEQC_SUMMARY"
+
+    tag "modules"
+    tag "modules_local"
+    tag "exomeqc_summary"
+
+    test("synthetic dragen + cnv + fingerprint") {
+
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/fixtures/summary/dragen", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/fixtures/summary/cnv-metrics.csv", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/fixtures/summary/crosscheck.crosscheck_metrics.txt", checkIfExists: true) ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert path(process.out.html[0]).text.contains("CNV QC 2/3 pass") },
+                { assert path(process.out.html[0]).text.contains("Fingerprint 1 unexpected, 1 inconclusive") },
+                { assert snapshot(
+                    process.out.tsv,
+                    process.out.biomarker,
+                    process.out.findAll { key, val -> key.startsWith('versions') }
+                ).match() }
+            )
+        }
+    }
+
+    test("synthetic dragen only") {
+
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/fixtures/summary/dragen", checkIfExists: true) ]
+                input[1] = []
+                input[2] = []
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert !path(process.out.html[0]).text.contains("CNV QC") },
+                { assert snapshot(process.out.tsv, process.out.biomarker).match() }
+            )
+        }
+    }
+
+    test("synthetic dragen - stub") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/fixtures/summary/dragen", checkIfExists: true) ]
+                input[1] = []
+                input[2] = []
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out.html, process.out.tsv, process.out.biomarker).match() }
+            )
+        }
+    }
+}

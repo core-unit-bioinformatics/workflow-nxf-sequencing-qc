@@ -14,6 +14,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 
 - [Fingerprint check](#fingerprint-check) - Sample identity checks within the run and against the fingerprint database of previous runs
 - [FastQ Screen](#fastq-screen) - Read-level contamination screening against multiple reference genomes
+- [Summary](#summary) - Compact per-case summary (CNV QC, purity, ploidy, TMB, MSI, HRD) on top of the report
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
 
@@ -128,6 +129,33 @@ The thresholds are described in [usage: DRAGEN CNV QC](usage.md#dragen-cnv-qc).
 </details>
 
 The parameters are described in [usage: VAF histogram](usage.md#vaf-histogram).
+
+### Summary
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `summary/`
+  - `exomeqc_summary.html`: the **Summary** shown on top of the MultiQC report (standalone fragment).
+  - `exomeqc_summary_multiqc_config.yml`: MultiQC config that puts the summary below the report title (`intro_text`), above General Statistics.
+  - `exomeqc_summary.tsv`: compact table, one row per case.
+  - `biomarker.tsv`: all DRAGEN TMB, MSI and HRD values per case.
+
+</details>
+
+`exomeqc_summary.tsv` columns:
+
+| Column   | Description                                                                                    |
+| -------- | ---------------------------------------------------------------------------------------------- |
+| `sample` | DRAGEN case (output file prefix)                                                               |
+| `cnv_qc` | `PASS`/`FAIL` from CNV QC (`n/a` if CNV QC is disabled or the case is missing)                 |
+| `purity` | DRAGEN `EstimatedTumorPurity`                                                                  |
+| `ploidy` | DRAGEN `OverallPloidy`                                                                         |
+| `tmb`    | DRAGEN `TMB` (mut/Mb)                                                                          |
+| `msi`    | DRAGEN `PercentageUnstableSites`; suffix `(invalid)` if `ResultIsValid` is false               |
+| `hrd`    | DRAGEN `HRD_sum` (LOH + TAI + LST)                                                             |
+
+`biomarker.tsv` has the same columns as `biomarker.csv` from the diagnostic somatic-exome workflow (`05-process-tsv-biomarker.py`): all TMB metrics, all MSI fields except `Settings`, then `LOH_score`, `TAI_score`, `LST_score`, `HRD_sum`. Unlike that script, HRD rows are keyed by file prefix, so all three biomarkers of one case share a row. Missing values are `n/a`.
 
 ### MultiQC
 

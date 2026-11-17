@@ -859,7 +859,12 @@ evaluate_qc_status <- function(all_metrics_df, thresholds) {
   })
 
   qc_status_df <- as.data.frame(t(qc_status), stringsAsFactors = FALSE)
-  cbind(qc_status_df, all_metrics_df)
+  # 'sample' must be the first column: MultiQC custom content uses it as row ID.
+  cbind(
+    all_metrics_df["sample"],
+    qc_status_df,
+    all_metrics_df[setdiff(names(all_metrics_df), "sample")]
+  )
 }
 
 # Merge all metric sources by sample and keep all samples for QC reporting.
@@ -926,6 +931,7 @@ run_self_tests <- function() {
   )
 
   qc <- evaluate_qc_status(mock, parse_thresholds(list(pmad_max = "0.2")))
+  stopifnot(identical(names(qc)[1:3], c("sample", "QC_STATUS", "QC_FAIL_REASONS")))
   stopifnot(qc$QC_STATUS[qc$sample == "S1"] == "PASS")
   stopifnot(qc$QC_STATUS[qc$sample == "S2"] == "FAIL")
   stopifnot(qc$QC_STATUS[qc$sample == "S3"] == "FAIL")

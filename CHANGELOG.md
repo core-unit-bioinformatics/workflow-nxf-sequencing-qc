@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Failed sites are masked in the fingerprint with flat genotype likelihoods (`PL=0,0,0`), so they do not contribute to any comparison. bcftools annotate writes the site QC into the fingerprint (`FORMAT/FT`, `FPDP`, `FPAD`, `FPBQ`) and a `##SAMPLE` header line with the QC status, the failed criteria, the observed values and the thresholds.
   - The updated database has exactly one `##SAMPLE` QC line per fingerprint (`FINGERPRINT_DATABASE_HEADER`, `bin/fingerprint_database_header.py`, then bcftools reheader); fingerprints added before the QC existed are marked `ExomeqcFingerprintQC=NOT_RECORDED` and logged as `WARNING`.
   - MultiQC section "Fingerprint QC" with status, failed criteria, values and thresholds of each sample; the QC status in the overview, and the QC status of both fingerprints in the database matches (`fingerprint_qc`, `database_fingerprint_qc`). New outputs `fingerprintcheck/qc/` and `fingerprintcheck/database/fingerprint_database_qc.tsv`.
+- Compact **Summary** section on top of the MultiQC report: per case CNV QC, purity, ploidy, TMB, MSI and HRD (DRAGEN), run-level CNV QC and fingerprint status; full biomarker values, CNV fail reasons, unexpected fingerprint pairs and incomplete cases in collapsed details (`EXOMEQC_SUMMARY`, `bin/exomeqc_summary.py`).
+- Params `enable_summary`, `summary_tmb_high`, `summary_msi_high`, `summary_hrd_high` (highlight cutoffs, unset by default).
+- Outputs `summary/exomeqc_summary.tsv` and `summary/biomarker.tsv`.
 
 ### `Fixed`
 
@@ -47,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The stub of `DRAGEN_CNV_QC` now creates the same files as a real run with the default `ext.args` (`cnv-metrics.csv`, `purcov_maxmodel_lineplot.json`, `karyoplot-*_mqc.png`, with `ext.prefix`).
 - `DRAGEN_CNV_QC` failed with a missing-output error if the DRAGEN output had no `*.cnv.purity.coverage.models.tsv` (no `*.json`) or no `*.tn.tsv.gz`/`*.tumor.baf.bedgraph.gz` (no `*.png`). These outputs are now optional, as documented in `docs/usage.md`. No change in results.
 - `bin/analyze_cnv_metrics.R` was committed without the executable bit (mode 100644), so `DRAGEN_CNV_QC` failed with `Permission denied` (exit 126) when run from a fresh clone. It is now executable (100755). No change in results.
+- CNV QC Metrics table in MultiQC lost samples: `cnv-metrics.csv` started with `QC_STATUS`, which MultiQC used as row ID, so all PASS (or FAIL) samples collapsed into one row. `sample` is now the first column.
 
 ### `Changed`
 

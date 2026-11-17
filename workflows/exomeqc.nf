@@ -7,6 +7,7 @@ include { MULTIQC                 } from '../modules/nf-core/multiqc/main'
 include { FASTQSCREEN_FASTQSCREEN } from '../modules/nf-core/fastqscreen/fastqscreen/main'
 include { DRAGEN_CNV_QC           } from '../modules/local/dragen_cnv_qc/main'
 include { VAF_HISTOGRAM           } from '../modules/local/vaf_histogram/main'
+include { EXOMEQC_SUMMARY         } from '../modules/local/exomeqc_summary/main'
 include { FINGERPRINTCHECK        } from '../subworkflows/local/fingerprintcheck/main'
 include { samplesheetToList       } from 'plugin/nf-schema'
 include { paramsSummaryMap        } from 'plugin/nf-schema'
@@ -29,6 +30,7 @@ workflow EXOMEQC {
     // initialize empty channels for collecting software versions and multiQC files
     ch_versions = channel.empty()
     ch_multiqc_files = channel.empty()
+    ch_summary_mqc_config = channel.empty()
 
     // Collect output files for multiQC
     // using the nf-schema samplesheetToList function for adding directories to multiqc via config file
@@ -112,6 +114,33 @@ workflow EXOMEQC {
     }
 
     //
+    // MODULE: compact summary (CNV QC, purity, ploidy, TMB, MSI, HRD) on top of the report
+    //
+    if (params.enable_summary) {
+        if (!params.dragen_dirs) {
+            log.warn("Summary skipped: --dragen_dirs is not set (set --enable_summary false to silence this)")
+        } else {
+            ch_summary_cnv = params.enable_cnvqc ?
+                DRAGEN_CNV_QC.out.metrics.collect().ifEmpty([]) :
+                channel.value([])
+            ch_summary_fp  = params.enable_fingerprintcheck ?
+                FINGERPRINTCHECK.out.crosscheck_metrics
+                    .map { _meta, crosscheck_metrics -> crosscheck_metrics }
+                    .collect()
+                    .ifEmpty([]) :
+                channel.value([])
+
+            EXOMEQC_SUMMARY(
+                channel.fromPath(params.dragen_dirs, type: 'dir', checkIfExists: true).collect(),
+                ch_summary_cnv,
+                ch_summary_fp
+            )
+            // passed as the last MultiQC config: sets intro_text (top of report)
+            ch_summary_mqc_config = EXOMEQC_SUMMARY.out.multiqc_config
+        }
+    }
+
+    //
     // Collate and save software versions
     //
     def topic_versions = channel.topic("versions")
@@ -180,7 +209,7 @@ workflow EXOMEQC {
 
     MULTIQC (
         ch_multiqc_files.collect(),
-        ch_multiqc_config.mix(ch_multiqc_custom_config).toList(),
+        ch_multiqc_config.concat(ch_multiqc_custom_config, ch_summary_mqc_config).toList(),
         ch_multiqc_logo.toList(),
         [],
         []

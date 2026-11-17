@@ -1,0 +1,4 @@
+"sample","QC_STATUS","QC_FAIL_REASONS","EstimatedTumorPurity","OverallPloidy","PMAD"
+"caseA","PASS","none","0.62","2.05","0.11"
+"caseB","FAIL","PMAD=0.31>0.2;NoModelFound:EstimatedTumorPurity=NA",NA,"3.10","0.31"
+"caseC","PASS","none","0.35","1.98","0.12"
