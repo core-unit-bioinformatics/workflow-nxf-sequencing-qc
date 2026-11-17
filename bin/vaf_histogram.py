@@ -274,7 +274,7 @@ def count_vcf(
                 for col, column in selected:
                     counts, summary = result[column]
                     summary["records_read"] += 1
-                    # count only PASS records unless filtered records are included
+                    # count only PASS and '.' records unless filtered records are included
                     if not passed and not include_filtered:
                         summary["records_filtered"] += 1
                         continue
@@ -422,10 +422,12 @@ def main(argv=None):
     duplicates = sorted({s for s in samples if samples.count(s) > 1})
     if duplicates:
         fail(f"sample(s) given more than once with --input: {', '.join(duplicates)}")
+    # no nested double quotes in the f-string: they need Python >= 3.12
+    counted_records = "all" if args.include_filtered else "PASS and '.'"
     log(
         "INFO",
         f"{len(args.input)} VCF(s); VAF source {args.allele_fraction}; bin width {fmt_edge(width)} "
-        f"({len(bins)} bins); counting {'all' if args.include_filtered else "PASS and '.'"} records",
+        f"({len(bins)} bins); counting {counted_records} records",
     )
 
     histograms = {}
@@ -462,7 +464,7 @@ def main(argv=None):
             log(
                 "INFO",
                 f"{path.name}: {name} (column {column}): {summary['records_read']} records read, "
-                f"{summary['records_filtered']} skipped as not PASS, {summary['alleles_counted']} alleles counted, "
+                f"{summary['records_filtered']} skipped as not PASS or '.', {summary['alleles_counted']} alleles counted, "
                 f"{summary['alleles_non_variant']} skipped as non-variant ALT, "
                 f"{summary['alleles_not_in_genotype']} skipped as not in the sample's GT",
             )

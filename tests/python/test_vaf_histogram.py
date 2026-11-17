@@ -637,3 +637,23 @@ def test_filter_missing_is_counted_and_logged(tmp_path, capsys):
     assert nonzero(tsv, "S1") == {"0.50": 1}
     assert summary[1][4:] == ["2", "1", "1", "0", "0", "1"]
     assert "1 record(s) with FILTER '.'" in capsys.readouterr().err
+
+
+def test_script_compiles_before_python_312():
+    """The script has a python3 shebang, so it must not need Python 3.12 syntax
+    (e.g. nested double quotes in f-strings); skipped without an older python."""
+    import shutil
+    import subprocess
+
+    older = next(
+        (p for v in ("3.11", "3.10", "3.9") if (p := shutil.which(f"python{v}"))),
+        None,
+    )
+    if older is None:
+        pytest.skip("no python3.9-3.11 on PATH")
+    result = subprocess.run(
+        [older, "-m", "py_compile", str(REPO / "bin" / "vaf_histogram.py")],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
