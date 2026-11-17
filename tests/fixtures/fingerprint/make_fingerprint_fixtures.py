@@ -19,8 +19,8 @@ case of the fingerprint database comparison is covered:
         SYN004_3-N  individual P4  no match; FASTQ only (alignment path)
 
 With --report-fixtures, the inputs of the module tests are made from these
-data with Picard and bcftools (both must be on PATH) and written to report/
-and multiqc/, in the same way as the pipeline makes them:
+data with Picard and bcftools (both must be on PATH) and written to report/,
+in the same way as the pipeline makes them:
 
     report/<sample>_<run>.fingerprint.vcf.gz   ExtractFingerprint of the BAMs
     report/previous_database.vcf.gz            database of run A
@@ -30,8 +30,6 @@ and multiqc/, in the same way as the pipeline makes them:
     report/fingerprint_database.crosscheck_metrics.txt
                                                run B against run A database
     report/database.vcf.gz                     updated database (A + B)
-    multiqc/fingerprint_database.crosscheck_metrics.txt
-                                               copy for the pipeline test
 
 Paths, dates and command lines are removed from their headers, so that the
 fixtures do not depend on the machine they were made on.
@@ -439,14 +437,6 @@ def make_report_fixtures(outdir):
             or path.name == "haplotype_map.txt"
         ):
             path.unlink()
-    # MultiQC input directory of the pipeline test: only the database crosscheck,
-    # which MultiQC must keep out of the Picard heatmap
-    multiqc = outdir / "multiqc"
-    multiqc.mkdir(exist_ok=True)
-    shutil.copy(
-        report / "fingerprint_database.crosscheck_metrics.txt",
-        multiqc / "fingerprint_database.crosscheck_metrics.txt",
-    )
 
 
 # arguments of fingerprint_qc.py as set by conf/modules.config with the defaults,

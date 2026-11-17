@@ -8,6 +8,9 @@ multiqc/multiqc_data/llms-full.txt
 multiqc/multiqc_plots/{svg,pdf,png}/*.{svg,pdf,png}
 multiqc/multiqc_report.html
 pipeline_info/*.{html,json,txt,yml}
+# run-specific content (timestamps, work-dir paths); file names are still snapshotted
+multiqc/**
+fastqscreen/*_screen.html
 fingerprintcheck/*.crosscheck_metrics.txt
 fingerprintcheck/fingerprints/*.vcf.gz
 fingerprintcheck/fingerprints/*.vcf.gz.tbi
@@ -17,16 +20,3 @@ fingerprintcheck/database/*.crosscheck_metrics.txt
 fingerprintcheck/database/fingerprint_database_summary.tsv
 fingerprintcheck/database/fingerprint_database_overview_mqc.html
 samtools/*
-samplesheet_test.csv
-multiqc_inputs_test.csv
-multiqc/*_multiqc_report.html
-multiqc/*_multiqc_report_data/llms-full.txt
-multiqc/*_multiqc_report_data/multiqc.log
-multiqc/*_multiqc_report_data/multiqc.parquet
-multiqc/*_multiqc_report_data/multiqc_data.json
-multiqc/*_multiqc_report_data/multiqc_sources.txt
-multiqc/*_multiqc_report_data/picard_crosscheckfingerprints.txt
-multiqc/*_multiqc_report_plots/**
-multiqc/*_multiqc_report_data/picard-crosscheckfingerprints-heatmap.txt
-multiqc/*_multiqc_report_data/picard-crosscheckfingerprints-table.txt
-multiqc/*_multiqc_report_data/multiqc_picard-crosscheckfingerprints-table_table.txt

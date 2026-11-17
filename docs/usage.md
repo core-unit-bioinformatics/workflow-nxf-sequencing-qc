@@ -317,7 +317,11 @@ To further assist in reproducibility, you can use share and reuse [parameter fil
 
 ## Test profile
 
-`-profile test` runs the pipeline on a small public dataset. **Nextflow does not download
+`-profile test` and `-profile test_full` are **disabled** for now: there is no test dataset
+with direct download links yet, and the pipeline stops with an error when they are used.
+They are not run in GitHub CI either.
+
+`-profile test_seqc2` runs the pipeline on a small public dataset. **Nextflow does not download
 the test data.** Create it once with the download script, then run the profile from the same
 directory:
 
@@ -330,7 +334,7 @@ conda activate seqc2_testdata
 scripts/download_seqc2_testdata.py --outdir testdata
 
 # 3. run the test profile from the directory that contains testdata/
-nextflow run core-unit-bioinformatics/exomeqc -profile test,<docker/singularity/conda> --outdir results_test
+nextflow run core-unit-bioinformatics/exomeqc -profile test_seqc2,<docker/singularity/conda> --outdir results_test
 ```
 
 The `scripts/` folder is in the pipeline repository: clone it, or use the copy that
@@ -373,6 +377,19 @@ check can and cannot tell on small regions:
 
 The test profile checks that the steps run. It is not a benchmark of identity calling.
 
+nf-test: the pipeline test `tests/default.nf.test` uses `-profile test_seqc2` and needs the data
+in `testdata/` of the repository. It is excluded from GitHub CI (`nf-test.config` ignores it)
+and runs locally with its own nf-test config:
+
+```bash
+scripts/download_seqc2_testdata.py --outdir testdata
+nf-test test tests/default.nf.test --config tests/seqc2/nf-test.config --profile +docker
+```
+
+The snapshot compares output file names, the FastQ Screen tables, the software versions and the
+fingerprint results (pair, `RESULT`, LOD scores). Files with run-specific content (MultiQC,
+FastQ Screen HTML, raw Picard metrics) are listed in `tests/.nftignore`.
+
 Contents of `testdata/seqc2/` (all from the region above):
 
 | Path                    | Content                                                                                        |
@@ -404,14 +421,15 @@ Several generic profiles are bundled with the pipeline which instruct the pipeli
 
 The pipeline also dynamically loads configurations from [https://github.com/nf-core/configs](https://github.com/nf-core/configs) when it runs, making multiple config profiles for various institutional clusters available at run time. For more information and to check if your system is supported, please see the [nf-core/configs documentation](https://github.com/nf-core/configs#documentation).
 
-Note that multiple profiles can be loaded, for example: `-profile test,docker` - the order of arguments is important!
+Note that multiple profiles can be loaded, for example: `-profile test_seqc2,docker` - the order of arguments is important!
 They are loaded in sequence, so later profiles can overwrite earlier profiles.
 
 If `-profile` is not specified, the pipeline will run locally and expect all software to be installed and available on the `PATH`. This is _not_ recommended, since it can lead to different results on different machines dependent on the computer environment.
 
-- `test`
-  - A profile with a complete configuration for automated testing, see [Test profile](#test-profile)
-  - Includes links to test data so needs no other parameters
+- `test`, `test_full`
+  - Disabled for now (no test data with direct links); see [Test profile](#test-profile)
+- `test_seqc2`
+  - SEQC2 tumor/normal test (panel, exome, genome); needs the data from `scripts/download_seqc2_testdata.py`, see [Test profile](#test-profile)
 - `docker`
   - A generic configuration profile to be used with [Docker](https://docker.com/)
 - `singularity`

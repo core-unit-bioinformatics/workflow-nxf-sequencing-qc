@@ -35,11 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compact **Summary** section on top of the MultiQC report: per case CNV QC, purity, ploidy, TMB, MSI and HRD (DRAGEN), run-level CNV QC and fingerprint status; full biomarker values, CNV fail reasons, unexpected fingerprint pairs and incomplete cases in collapsed details (`EXOMEQC_SUMMARY`, `bin/exomeqc_summary.py`).
 - Params `enable_summary`, `summary_tmb_high`, `summary_msi_high`, `summary_hrd_high` (highlight cutoffs, unset by default).
 - Outputs `summary/exomeqc_summary.tsv` and `summary/biomarker.tsv`.
-- `-profile test` now runs on SEQC2 HCC1395/HCC1395BL tumor/normal data (gene panel, exome and genome,
+- `-profile test_seqc2`: SEQC2 HCC1395/HCC1395BL tumor/normal data (gene panel, exome and genome,
   ALK region, GRCh38) with a FastQ Screen database and haplotype map. The data are built locally with
   `scripts/download_seqc2_testdata.py` (conda env `scripts/envs/seqc2_testdata.yaml`) before running the profile.
-- `--multiqc_inputs` is optional.
-- `--fastqscreen_database` accepts a `.tar.gz` of the database directory (unpacked with nf-core `untar`).
+- nf-test `tests/default.nf.test` (local only, `--config tests/seqc2/nf-test.config`) with a stable snapshot.
 
 ### `Fixed`
 
@@ -68,6 +67,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fingerprint database: this run's fingerprints are crosschecked against the database and added to it after the fingerprint QC, with failed sites masked; the published fingerprints (`fingerprintcheck/fingerprints/`) are the fingerprints after QC.
 - MultiQC: `fingerprint_database.crosscheck_metrics.txt` is excluded from the Picard module (`sp.picard/crosscheckfingerprints.exclude_fn`), so database samples never enter the heatmap.
 - CNV QC Metrics table: columns ordered `QC_STATUS`, `QC_FAIL_REASONS`, `NORMAL_SEX`, `TUMOR_SEX`, `EstimatedTumorPurity`, `PMAD`, `Coverage MAD`, `DiploidCoverage`, `HomozygosityIndex`, `OutlierBafFraction`, `ModelSource`, then all others; tumor purity shown as whole percent with bars (0–100 %).
+- `-profile test` and `-profile test_full` are disabled (error message points to `test_seqc2`) until a test
+  dataset with direct download links exists; they are not used in GitHub CI (`nf-test.config`, `download_pipeline.yml`).
+- `--multiqc_inputs` is optional.
+- `--fastqscreen_database` accepts a `.tar.gz` of the database directory (unpacked with nf-core `untar`).
 
 ### `Dependencies`
 

@@ -14,3 +14,7 @@ null/
 
 # SEQC2 test data (scripts/download_seqc2_testdata.py)
 testdata/
+
+# nf-test
+.nf-test/
+.nf-test.log

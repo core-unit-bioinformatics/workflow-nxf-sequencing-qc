@@ -42,6 +42,11 @@ workflow PIPELINE_INITIALISATION {
     ch_versions = channel.empty()
 
     //
+    // Stop early if a disabled test profile is used
+    //
+    disabledTestProfileError()
+
+    //
     // Print version and exit if required and dump pipeline parameters to JSON file
     //
     UTILS_NEXTFLOW_PIPELINE (
@@ -167,6 +172,18 @@ workflow PIPELINE_COMPLETION {
 //
 def validateInputParameters() {
     genomeExistsError()
+}
+
+//
+// -profile test and -profile test_full are disabled until test data with direct links exist
+//
+def disabledTestProfileError() {
+    def disabled = workflow.profile.tokenize(',').intersect(['test', 'test_full'])
+    if (disabled) {
+        error("Profile '${disabled.join(',')}' is disabled: there is no test dataset with direct download links yet. " +
+            "Use '-profile test_seqc2' instead; it needs the SEQC2 test data downloaded once with " +
+            "'scripts/download_seqc2_testdata.py --outdir testdata' (see docs/usage.md, section 'Test profile').")
+    }
 }
 
 //
