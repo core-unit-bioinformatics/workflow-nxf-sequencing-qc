@@ -85,8 +85,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New nf-core modules: `picard/extractfingerprint` (Picard 3.5.0), `bcftools/view` and `bcftools/merge` (bcftools 1.23.1), `bwamem2/index` and `bwamem2/mem` (bwa-mem2 2.3, whose binary reports version 2.2.1; samtools 1.22.1), `samtools/faidx` (samtools 1.24), `picard/createsequencedictionary` (Picard 3.5.0).
 - New nf-core modules for the fingerprint QC: `samtools/mpileup` (samtools 1.25), `gawk` (GNU Awk 5.3.1), `htslib/bgziptabix` (HTSlib 1.25), `bcftools/annotate` and `bcftools/reheader` (bcftools 1.25); new local modules `fingerprint_qc` and `fingerprint_database_header` (PyVCF3 container as below).
 - New local modules `check_fingerprint_database` and `fingerprint_database_report` (Python 3.12, PyVCF3 1.0.4, the maintained fork of PyVCF; biocontainer `pyvcf3:1.0.4--py312h0fa9677_0`).
+- nf-core pipeline template updated from nf-core/tools 3.5.2 to 4.2.2 (requires Nextflow >= 25.10.4).
+- nf-core/multiqc module updated to the template version; local patch `multiqc.diff` dropped. The pipeline
+  MultiQC config is still applied first and extended (not replaced) by `--multiqc_config`.
 
-## v0.1dev - [date]
+## v1.0.0 - [unreleased<!-- TODO nf-core: replace with date on release -->]
 
 Initial release of core-unit-bioinformatics/exomeqc, created with the [nf-core](https://nf-co.re/) template.
 

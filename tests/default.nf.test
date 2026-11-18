@@ -24,10 +24,10 @@ nextflow_pipeline {
         then {
             // the updated database is named with the start time of the run
             def database_pattern = 'fingerprintcheck/database/exomeqc_fingerprint_database_*'
-            // stable_name: All files + folders in ${params.outdir}/ with a stable name
-            def stable_name = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/*_multiqc_report_plots/**', database_pattern])
-            // stable_path: All files in ${params.outdir}/ with stable content
-            def stable_path = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
+            // stable_path: All files + folders in ${params.outdir}/ with a stable path (including file name)
+            def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/*_multiqc_report_plots/**', database_pattern])
+            // stable_content: All files in ${params.outdir}/ with stable content
+            def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
             // Picard metrics hold a run date and work-dir paths: snapshot only the results
             def crosscheck = path("$outputDir/fingerprintcheck/crosscheck.crosscheck_metrics.txt").readLines()
                 .findAll { line -> line && !line.startsWith('#') }
@@ -43,8 +43,8 @@ nextflow_pipeline {
             // MultiQC names its data directory after the report title
             def multiqc_data = new File("${params.outdir}/multiqc").listFiles().find { dir -> dir.name.endsWith('multiqc_report_data') }
             def multiqc_report = new File("${params.outdir}/multiqc").listFiles().find { f -> f.name.endsWith('multiqc_report.html') }
+            assert workflow.success
             assertAll(
-                { assert workflow.success},
                 // one updated database with index, named exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>
                 { assert databases.size() == 2 },
                 { assert databases[0] ==~ /exomeqc_fingerprint_database_\d{8}-\d{6}\.vcf\.gz/ },
@@ -58,9 +58,9 @@ nextflow_pipeline {
                     // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
                     removeNextflowVersion("$outputDir/pipeline_info/exomeqc_software_mqc_versions.yml"),
                     // All stable path name, with a relative path
-                    stable_name,
-                    // All files with stable contents
                     stable_path,
+                    // All files with stable contents
+                    stable_content,
                     // the fingerprint database summary without the timestamped database name
                     summary.findAll { line -> !line.startsWith('updated_database_file') },
                     // Fingerprint results (pair, RESULT, LOD scores)
