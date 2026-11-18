@@ -2,14 +2,48 @@
     "-profile test_seqc2": {
         "content": [
             {
+                "BCFTOOLS_ANNOTATE_FINGERPRINT_QC": {
+                    "bcftools": 1.25
+                },
+                "BCFTOOLS_MERGE_FINGERPRINT_DATABASE": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_REHEADER_FINGERPRINT_DATABASE": {
+                    "bcftools": 1.25
+                },
                 "FASTQSCREEN_FASTQSCREEN": {
                     "fastqscreen": "0.16.0"
+                },
+                "FINGERPRINT_DATABASE_HEADER": {
+                    "python": "3.12.16",
+                    "pyvcf3": "1.0.4"
+                },
+                "FINGERPRINT_DATABASE_REPORT": {
+                    "python": "3.12.16",
+                    "pyvcf3": "1.0.4"
+                },
+                "FINGERPRINT_QC": {
+                    "python": "3.12.16",
+                    "pyvcf3": "1.0.4"
+                },
+                "GAWK_FINGERPRINT_SITES": {
+                    "gawk": "5.3.1"
+                },
+                "HTSLIB_BGZIPTABIX_FINGERPRINT_QC": {
+                    "htslib": 1.25,
+                    "xz": "5.8.3"
                 },
                 "PICARD_CROSSCHECKFINGERPRINTS": {
                     "picard": "3.4.0"
                 },
+                "PICARD_EXTRACTFINGERPRINT": {
+                    "picard": "3.5.0"
+                },
                 "SAMTOOLS_INDEX": {
                     "samtools": "1.23.1"
+                },
+                "SAMTOOLS_MPILEUP_FINGERPRINT": {
+                    "samtools": 1.25
                 },
                 "UNTAR": {
                     "untar": 1.34
@@ -58,6 +92,40 @@
                 "fastqscreen/SEQC2_PANEL_HCC1395_R2_screen.txt",
                 "fingerprintcheck",
                 "fingerprintcheck/crosscheck.crosscheck_metrics.txt",
+                "fingerprintcheck/database",
+                "fingerprintcheck/database/fingerprint_database_fingerprints.tsv",
+                "fingerprintcheck/database/fingerprint_database_matches.tsv",
+                "fingerprintcheck/database/fingerprint_database_matches_mqc.html",
+                "fingerprintcheck/database/fingerprint_database_overview_mqc.html",
+                "fingerprintcheck/database/fingerprint_database_qc.tsv",
+                "fingerprintcheck/database/fingerprint_database_qc_mqc.tsv",
+                "fingerprintcheck/database/fingerprint_database_summary.tsv",
+                "fingerprintcheck/fingerprints",
+                "fingerprintcheck/fingerprints/SEQC2_EXOME_HCC1395BL_SEQC2_EXOME.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/SEQC2_EXOME_HCC1395BL_SEQC2_EXOME.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/SEQC2_EXOME_HCC1395_SEQC2_EXOME.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/SEQC2_EXOME_HCC1395_SEQC2_EXOME.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/SEQC2_GENOME_HCC1395BL_SEQC2_GENOME.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/SEQC2_GENOME_HCC1395BL_SEQC2_GENOME.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/SEQC2_GENOME_HCC1395_SEQC2_GENOME.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/SEQC2_GENOME_HCC1395_SEQC2_GENOME.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/SEQC2_PANEL_HCC1395BL_SEQC2_PANEL.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/SEQC2_PANEL_HCC1395BL_SEQC2_PANEL.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/fingerprints/SEQC2_PANEL_HCC1395_SEQC2_PANEL.fingerprint.vcf.gz",
+                "fingerprintcheck/fingerprints/SEQC2_PANEL_HCC1395_SEQC2_PANEL.fingerprint.vcf.gz.tbi",
+                "fingerprintcheck/qc",
+                "fingerprintcheck/qc/SEQC2_EXOME_HCC1395BL_SEQC2_EXOME.fingerprint_qc_sites.tsv",
+                "fingerprintcheck/qc/SEQC2_EXOME_HCC1395BL_SEQC2_EXOME.fingerprint_qc_summary.tsv",
+                "fingerprintcheck/qc/SEQC2_EXOME_HCC1395_SEQC2_EXOME.fingerprint_qc_sites.tsv",
+                "fingerprintcheck/qc/SEQC2_EXOME_HCC1395_SEQC2_EXOME.fingerprint_qc_summary.tsv",
+                "fingerprintcheck/qc/SEQC2_GENOME_HCC1395BL_SEQC2_GENOME.fingerprint_qc_sites.tsv",
+                "fingerprintcheck/qc/SEQC2_GENOME_HCC1395BL_SEQC2_GENOME.fingerprint_qc_summary.tsv",
+                "fingerprintcheck/qc/SEQC2_GENOME_HCC1395_SEQC2_GENOME.fingerprint_qc_sites.tsv",
+                "fingerprintcheck/qc/SEQC2_GENOME_HCC1395_SEQC2_GENOME.fingerprint_qc_summary.tsv",
+                "fingerprintcheck/qc/SEQC2_PANEL_HCC1395BL_SEQC2_PANEL.fingerprint_qc_sites.tsv",
+                "fingerprintcheck/qc/SEQC2_PANEL_HCC1395BL_SEQC2_PANEL.fingerprint_qc_summary.tsv",
+                "fingerprintcheck/qc/SEQC2_PANEL_HCC1395_SEQC2_PANEL.fingerprint_qc_sites.tsv",
+                "fingerprintcheck/qc/SEQC2_PANEL_HCC1395_SEQC2_PANEL.fingerprint_qc_summary.tsv",
                 "multiqc",
                 "multiqc/Exome-Sequencing_multiqc_report.html",
                 "multiqc/Exome-Sequencing_multiqc_report_data",
@@ -67,6 +135,7 @@
                 "multiqc/Exome-Sequencing_multiqc_report_data/multiqc.parquet",
                 "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_citations.txt",
                 "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_data.json",
+                "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_exomeqc_fingerprint_qc_table.txt",
                 "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_fastq_screen.txt",
                 "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_general_stats.txt",
                 "multiqc/Exome-Sequencing_multiqc_report_data/multiqc_picard-crosscheckfingerprints-table_table.txt",
@@ -81,24 +150,6 @@
                 "multiqc/Exome-Sequencing_multiqc_report_data/picard_QualityScoreDistribution_histogram.txt",
                 "multiqc/Exome-Sequencing_multiqc_report_data/picard_crosscheckfingerprints.txt",
                 "multiqc/Exome-Sequencing_multiqc_report_plots",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/pdf",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/pdf/fastq_screen_plot-cnt.pdf",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/pdf/fastq_screen_plot-pct.pdf",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/pdf/picard-crosscheckfingerprints-heatmap.pdf",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/pdf/picard-crosscheckfingerprints-sample-table.pdf",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/pdf/picard-crosscheckfingerprints-table.pdf",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/png",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/png/fastq_screen_plot-cnt.png",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/png/fastq_screen_plot-pct.png",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/png/picard-crosscheckfingerprints-heatmap.png",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/png/picard-crosscheckfingerprints-sample-table.png",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/png/picard-crosscheckfingerprints-table.png",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/svg",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/svg/fastq_screen_plot-cnt.svg",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/svg/fastq_screen_plot-pct.svg",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/svg/picard-crosscheckfingerprints-heatmap.svg",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/svg/picard-crosscheckfingerprints-sample-table.svg",
-                "multiqc/Exome-Sequencing_multiqc_report_plots/svg/picard-crosscheckfingerprints-table.svg",
                 "pipeline_info",
                 "pipeline_info/exomeqc_software_mqc_versions.yml",
                 "samtools",
@@ -151,12 +202,15 @@
                 "SEQC2_PANEL_HCC1395_R1_screen.txt:md5,498106aae02fef61fb1c026092424446",
                 "SEQC2_PANEL_HCC1395_R2_screen.png:md5,4e3712042725068355d766c0b5530276",
                 "SEQC2_PANEL_HCC1395_R2_screen.txt:md5,7ca8ac60dd1e863c9b5d4ff1daa1181d",
-                "SEQC2_EXOME_HCC1395.bam.bai:md5,48586c218cb355b30f2aa367c561d307",
-                "SEQC2_EXOME_HCC1395BL.bam.bai:md5,a5a8119898d121637568a5bccc40fa48",
-                "SEQC2_GENOME_HCC1395.bam.bai:md5,0740c7bf7efd80dd03178f6650cf2e14",
-                "SEQC2_GENOME_HCC1395BL.bam.bai:md5,f08687e9f82119382a8dc8307f05f6ad",
-                "SEQC2_PANEL_HCC1395.bam.bai:md5,a25346cd9faa597a822972b3cda48610",
-                "SEQC2_PANEL_HCC1395BL.bam.bai:md5,7fb979e500ebe7d26fb0989f1742b33f",
+                "fingerprint_database_fingerprints.tsv:md5,41892c02025e0d713d14e7a45f2d39e9",
+                "fingerprint_database_matches.tsv:md5,82fed3a2409f31232b022f4ffd3d65e3",
+                "fingerprint_database_matches_mqc.html:md5,bf8e13a8a3fc1e006f995275c5b9f126",
+                "SEQC2_EXOME_HCC1395BL_SEQC2_EXOME.fingerprint_qc_sites.tsv:md5,8b068306e376acba1d4b54163a40a9a9",
+                "SEQC2_EXOME_HCC1395_SEQC2_EXOME.fingerprint_qc_sites.tsv:md5,eaa2c221c5e1a9dc440bddbc1e963175",
+                "SEQC2_GENOME_HCC1395BL_SEQC2_GENOME.fingerprint_qc_sites.tsv:md5,7ea05ed7f92b6cf86e1a057ca106686b",
+                "SEQC2_GENOME_HCC1395_SEQC2_GENOME.fingerprint_qc_sites.tsv:md5,9b357210ea9976aacc7b76930b1db37d",
+                "SEQC2_PANEL_HCC1395BL_SEQC2_PANEL.fingerprint_qc_sites.tsv:md5,5f0a4a4de3ffc3fd2e6cf6808d45020d",
+                "SEQC2_PANEL_HCC1395_SEQC2_PANEL.fingerprint_qc_sites.tsv:md5,5f0a4a4de3ffc3fd2e6cf6808d45020d",
                 "human_slice.1.bt2:md5,2e695b9ab3dc18b27483d0347f82dc24",
                 "human_slice.2.bt2:md5,a77ad7526db504b01f03db9a6c0a2896",
                 "human_slice.3.bt2:md5,123b1717a761500ffa59d54959215d26",
@@ -170,6 +224,38 @@
                 "phix.rev.1.bt2:md5,a416ac2d083705b596790bec61d36683",
                 "phix.rev.2.bt2:md5,40219f42890c91dd08ce4d17e9f533fb",
                 "fastq_screen.conf:md5,27d865033633d5d9c21abde3b72e8275"
+            ],
+            [
+                "metric\tvalue",
+                "lod_threshold\t5",
+                "haplotype_map_file\thaplotype_map.txt",
+                "haplotype_map_snps\t24",
+                "haplotype_map_blocks\t24",
+                "run_samples\t6",
+                "run_samples_suitable\t2",
+                "run_samples_insufficient\t2",
+                "run_samples_no_coverage\t2",
+                "run_samples_qc_pass\t2",
+                "run_samples_qc_fail\t4",
+                "database_qc_pass\t2",
+                "database_qc_fail\t4",
+                "database_qc_not_recorded\t0",
+                "database_given\tno",
+                "database_file\t",
+                "database_compression\t",
+                "previous_database_samples\t0",
+                "replaced_fingerprints\t0",
+                "checked_database_samples\t0",
+                "checked_database_runs\t0",
+                "database_samples\t6",
+                "comparisons\t0",
+                "unexpected_match\t0",
+                "unexpected_mismatch\t0",
+                "expected_match\t0",
+                "inconclusive_same_sample\t0",
+                "inconclusive_other_sample\t0",
+                "expected_mismatch\t0",
+                "reported_comparisons\t0"
             ],
             [
                 "SEQC2_EXOME_HCC1395.bam::WES_IL_T_1\tSEQC2_EXOME_HCC1395.bam::WES_IL_T_1\tEXPECTED_MATCH\t1.956422\t1.462632\t1.462632",
@@ -210,7 +296,7 @@
                 "SEQC2_PANEL_HCC1395BL.bam::HCC1395BL\tSEQC2_PANEL_HCC1395BL.bam::HCC1395BL\tINCONCLUSIVE\t0\t0\t0"
             ]
         ],
-        "timestamp": "2026-11-17T19:52:11.424642648",
+        "timestamp": "2026-11-18T12:29:34.311887192",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

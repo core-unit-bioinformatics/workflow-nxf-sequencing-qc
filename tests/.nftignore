@@ -20,3 +20,7 @@ fingerprintcheck/database/*.crosscheck_metrics.txt
 fingerprintcheck/database/fingerprint_database_summary.tsv
 fingerprintcheck/database/fingerprint_database_overview_mqc.html
 samtools/*
+# fingerprint QC tables hold the QC date (qc_date); the QC status is in fingerprint_database_fingerprints.tsv
+fingerprintcheck/qc/*.fingerprint_qc_summary.tsv
+fingerprintcheck/database/fingerprint_database_qc.tsv
+fingerprintcheck/database/fingerprint_database_qc_mqc.tsv

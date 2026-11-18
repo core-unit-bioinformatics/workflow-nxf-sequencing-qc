@@ -15,6 +15,9 @@ nextflow_pipeline {
                 input                     = "${baseDir}/testdata/seqc2/samplesheet.csv"
                 fastqscreen_database      = "${baseDir}/testdata/seqc2/fastqscreen_db.tar.gz"
                 fingerprint_haplotype_map = "${baseDir}/testdata/seqc2/haplotype_map.txt"
+                fasta                     = "${baseDir}/testdata/seqc2/reference.fasta"
+                fasta_fai                 = "${baseDir}/testdata/seqc2/reference.fasta.fai"
+                fasta_dict                = "${baseDir}/testdata/seqc2/reference.dict"
             }
         }
 

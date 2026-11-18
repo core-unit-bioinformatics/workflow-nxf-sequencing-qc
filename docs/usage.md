@@ -355,19 +355,41 @@ one pair each for **gene panel** (AmpliSeq), **exome** (WES) and **genome** (WGS
 `chr2:29700000-29740000` (GRCh38, ALK). With them come a FastQ Screen database (human region
 and PhiX, `.tar.gz`) and a Picard haplotype map of common 1000 Genomes SNPs in that region.
 
+The fingerprint check needs `--fasta`, the reference the BAMs are aligned to. The SEQC2 BAMs
+are aligned to `GRCh38_full_analysis_set_plus_decoy_hla` (about 3,300 contigs, 3 GB), which is
+too large for a test. The script therefore moves the reads onto a **reference slice**: the
+region padded by 1 kb on each side (`--padding`), written as one contig named after its GRCh38
+coordinates, `chr2_29699000_29741000` (1-based, inclusive; position 1 of the contig is
+chr2:29699000). The BAM header has this contig as its only `@SQ` line, read and mate positions
+are shifted by -29698999, and read pairs not fully inside the padded region are dropped. The
+haplotype map uses the same contig and shifted positions. To map a position back to GRCh38, add
+29698999.
+
+The samplesheet has the `runid` column the fingerprint check requires. The run IDs are made up:
+one per assay (`SEQC2_PANEL`, `SEQC2_EXOME`, `SEQC2_GENOME`), shared by tumor and normal, as
+each assay is a separate sequencing run. Fingerprint IDs are thus e.g.
+`SEQC2_EXOME_HCC1395@SEQC2_EXOME`.
+
 | Step              | In the test profile | Expected result                                                              |
 | ----------------- | ------------------- | ---------------------------------------------------------------------------- |
 | FastQ Screen      | on                  | 97-100 % of reads hit `Human`, none hit `PhiX`                                |
 | Fingerprint check | on                  | see below                                                                    |
 | DRAGEN CNV QC     | off                 | not run; SEQC2 has no DRAGEN CNV output                                       |
-| MultiQC           | always              | report with FastQ Screen and Picard fingerprint sections                     |
+| MultiQC           | always              | report with FastQ Screen, fingerprint overview/QC and Picard fingerprint sections |
 
-Fingerprint results on the test data (reference run with conda, 2026-11-17) show what the
-check can and cannot tell on small regions:
+Fingerprint results on the test data (reference run with conda, 2026-11-18; the LOD scores are
+the same as before the move onto the reference slice) show what the check can and cannot tell
+on small regions:
 
 - **Panel samples: `INCONCLUSIVE`** (LOD 0), even against themselves. None of the 24
   haplotype-map SNPs fall inside the AmpliSeq amplicons. This is the panel restriction
   described under [Fingerprint check](#fingerprint-check).
+- **Fingerprint QC and database:** only the genome samples pass (21 of 24 sites with depth
+  >= 10, self LOD 9.1 and 7.6, `SUITABLE`). The exome samples (6 blocks with reads, 2 passing
+  sites, self LOD 2.0 and 1.4) are `INSUFFICIENT`, the panel samples `NO_COVERAGE`; all four
+  get QC `FAIL` (logged as `WARNING`) and are still added to the database. No database is
+  given, so the updated database `exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` holds
+  the six fingerprints of this run.
 - **Same tissue across assays matches:** tumor exome vs tumor genome LOD +2.1, normal exome
   vs normal genome LOD +0.4.
 - **Tumor vs normal is negative** (genome: LOD -41, tumor-aware -5), although both come from
@@ -386,19 +408,22 @@ scripts/download_seqc2_testdata.py --outdir testdata
 nf-test test tests/default.nf.test --config tests/seqc2/nf-test.config --profile +docker
 ```
 
-The snapshot compares output file names, the FastQ Screen tables, the software versions and the
-fingerprint results (pair, `RESULT`, LOD scores). Files with run-specific content (MultiQC,
-FastQ Screen HTML, raw Picard metrics) are listed in `tests/.nftignore`.
+The snapshot compares output file names, the FastQ Screen tables, the software versions, the
+fingerprint results (pair, `RESULT`, LOD scores) and the fingerprint database tables. Files with
+run-specific content (MultiQC, FastQ Screen HTML, raw Picard metrics, fingerprint VCFs, QC tables
+with the QC date) are listed in `tests/.nftignore`; the test also checks that the updated
+fingerprint database is written with a timestamped name.
 
 Contents of `testdata/seqc2/` (all from the region above):
 
 | Path                    | Content                                                                                        |
 | ----------------------- | ---------------------------------------------------------------------------------------------- |
-| `bam/<sample>.bam(.bai)` | Complete, properly paired primary alignments, max. 4000 pairs per sample (panel ~2950, exome ~400, genome 4000) |
+| `bam/<sample>.bam(.bai)` | Complete primary read pairs fully inside the reference slice, on its contig, max. 4000 pairs per sample (panel ~2950, exome ~400, genome 4000) |
 | `fastq/<sample>_R{1,2}.fastq.gz` | The same read pairs as FASTQ                                                          |
 | `fastqscreen_db.tar.gz` | FastQ Screen database: Bowtie2 indices of the human region and PhiX174 (NC_001422.1)            |
-| `haplotype_map.txt`     | 24 biallelic SNPs with MAF >= 0.2 (1000 Genomes high-coverage panel), SEQC2 BAM dictionary      |
-| `samplesheet.csv`       | Samplesheet with absolute paths to the files above                                             |
+| `haplotype_map.txt`     | 24 biallelic SNPs with MAF >= 0.2 (1000 Genomes high-coverage panel) on the reference slice    |
+| `reference.fasta(.fai)`, `reference.dict` | Reference slice `chr2_29699000_29741000` (42,001 bp), passed as `--fasta`, `--fasta_fai`, `--fasta_dict` |
+| `samplesheet.csv`       | Samplesheet with run IDs and absolute paths to the files above                                 |
 
 Sources: SEQC2 files `AmpliSeq_bams/AmpliSeq.bwa.HCC1395{,BL}_1.bam`,
 `WES/WES_IL_{T,N}_1.bwa.dedup.bam` and `WGS/WGS_IL_{T,N}_1.bwa.dedup.bam`. The region was

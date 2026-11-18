@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ALK region, GRCh38) with a FastQ Screen database and haplotype map. The data are built locally with
   `scripts/download_seqc2_testdata.py` (conda env `scripts/envs/seqc2_testdata.yaml`) before running the profile.
 - nf-test `tests/default.nf.test` (local only, `--config tests/seqc2/nf-test.config`) with a stable snapshot.
+- SEQC2 test data for the fingerprint check: `scripts/download_seqc2_testdata.py` also writes a reference slice
+  `reference.fasta` (+ `.fai`, `.dict`; the region ±1 kb, new option `--padding`, as one contig
+  `chr2_29699000_29741000`) and a `runid` column in `samplesheet.csv` (made up, one per assay: `SEQC2_PANEL`,
+  `SEQC2_EXOME`, `SEQC2_GENOME`). `-profile test_seqc2` and `tests/default.nf.test` pass it as `--fasta`,
+  `--fasta_fai` and `--fasta_dict`, so the profile runs with the fingerprint check (on by default).
 
 ### `Fixed`
 
@@ -71,6 +76,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dataset with direct download links exists; they are not used in GitHub CI (`nf-test.config`, `download_pipeline.yml`).
 - `--multiqc_inputs` is optional.
 - `--fastqscreen_database` accepts a `.tar.gz` of the database directory (unpacked with nf-core `untar`).
+- SEQC2 test data (`scripts/download_seqc2_testdata.py`): the BAMs and the haplotype map are moved onto the
+  reference slice contig (single `@SQ` line, positions shifted by -29698999, `SA`/`XA` tags removed, read pairs not
+  fully inside the padded region dropped) instead of carrying the full GRCh38_full_analysis_set_plus_decoy_hla
+  dictionary (~3,300 contigs), whose 3 GB FASTA Picard ExtractFingerprint would otherwise need. Rebuild the test
+  data after updating.
+- `tests/default.nf.test`: the snapshot now covers the fingerprint database outputs; the fingerprint QC tables, which
+  hold the QC date, are listed in `tests/.nftignore`. Fingerprint LOD scores are unchanged by the move onto the
+  reference slice.
 
 ### `Dependencies`
 
