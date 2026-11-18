@@ -66,15 +66,15 @@ report_section_order:
     order: 980
   interop:
     order: 970
-  exomeqc_fingerprint_overview:
+  sequencingqc_fingerprint_overview:
     order: 962
-  exomeqc_fingerprint_qc:
+  sequencingqc_fingerprint_qc:
     order: 961
   picard:
     order: 960
-  exomeqc_fingerprint_database:
+  sequencingqc_fingerprint_database:
     order: 955
-  exomeqc_vaf_histogram:
+  sequencingqc_vaf_histogram:
     order: 950
   fastq_screen:
     order: 940
@@ -123,7 +123,7 @@ fn_ignore_dirs:
   - .nextflow*
 sp:
   # the crosscheck of this run against the fingerprint database is reported as
-  # exomeqc_fingerprint_database table; it must not enter the Picard heatmap
+  # sequencingqc_fingerprint_database table; it must not enter the Picard heatmap
   picard/crosscheckfingerprints:
     exclude_fn: "*fingerprint_database.crosscheck_metrics.txt"
   dragen_cnv_qc_metrics:

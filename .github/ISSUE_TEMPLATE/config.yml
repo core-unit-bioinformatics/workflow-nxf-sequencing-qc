@@ -2,6 +2,6 @@ contact_links:
   - name: Join nf-core
     url: https://nf-co.re/join
     about: Please join the nf-core community here
-  - name: "Slack #exomeqc channel"
-    url: https://nfcore.slack.com/channels/exomeqc
+  - name: "Slack #workflow-nxf-sequencing-qc channel"
+    url: https://nfcore.slack.com/channels/workflow-nxf-sequencing-qc
     about: Discussion about the core-unit-bioinformatics/workflow-nxf-sequencing-qc pipeline

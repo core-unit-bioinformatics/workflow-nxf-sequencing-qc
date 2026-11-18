@@ -7,7 +7,7 @@ description: |
   previous runs is given, checks it against the haplotype map, drops the
   fingerprints this run replaces (same <sample>@<runid>), converts it to bgzip
   with index and crosschecks this run against it; then appends this run's
-  fingerprints: the updated database exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz.
+  fingerprints: the updated database sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz.
   Reports the check (overview, fingerprint of each sample, matches with other
   runs) as tables and MultiQC custom content. Samples without BAM can be
   aligned with bwa-mem2.
@@ -69,7 +69,7 @@ output:
       description: "`[ meta, vcf.gz, tbi ]`: fingerprint of each sample"
   - database:
       type: channel
-      description: "`[ meta, vcf.gz, tbi ]`: updated database exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz"
+      description: "`[ meta, vcf.gz, tbi ]`: updated database sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz"
   - database_check:
       type: channel
       description: "`[ meta, previous_database_check.tsv ]`: check of the given database (only with a database)"

@@ -105,7 +105,7 @@ Details: [Fingerprint check and fingerprint database](#fingerprint-check-and-fin
 | `--fingerprint_haplotype_map`                 | unset   | Path to the Picard haplotype map (text format) used for the fingerprints.                                                                                            |
 | `--fingerprint_allow_duplicate_reads`         | `true`  | Allow duplicate reads in CrosscheckFingerprints of this run's BAMs (heatmap).                                                                                        |
 | `--align_reads_for_fingerprint`               | `false` | Align the FASTQ files of samples without BAM with bwa-mem2 for the fingerprint check.                                                                                |
-| `--fingerprint_database`                      | unset   | Fingerprint database of previous exomeqc runs (`fingerprintcheck/database/exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz`).                                   |
+| `--fingerprint_database`                      | unset   | Fingerprint database of previous sequencingqc runs (`fingerprintcheck/database/sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz`).                                   |
 | `--fingerprint_database_lod_threshold`        | `5`     | LOD threshold T for comparisons with the fingerprint database: match if LOD >= T, mismatch if LOD <= -T, inconclusive in between.                                    |
 | `--fingerprint_qc_min_base_quality`           | `20`    | Fingerprint QC: minimum base quality of a base to count for the depth (FPDP), the allele depths and the contamination estimate.                                      |
 | `--fingerprint_qc_min_mapping_quality`        | `20`    | Fingerprint QC: minimum mapping quality of a read to count at a haplotype site.                                                                                      |
@@ -206,7 +206,7 @@ outdir: results
 fastqscreen_database: /refs/FastQ_Screen_Genomes
 fingerprint_haplotype_map: /refs/hg38_haplotype_map.txt
 fasta: /refs/GRCh38.fasta
-fingerprint_database: /data/run00/results/fingerprintcheck/database/exomeqc_fingerprint_database_20260101-120000.vcf.gz
+fingerprint_database: /data/run00/results/fingerprintcheck/database/sequencingqc_fingerprint_database_20260101-120000.vcf.gz
 dragen_dirs: /data/run01/dragen
 multiqc_report_name: 20260101_LH00001_0001_AXXXXXXXX
 ```
@@ -260,7 +260,7 @@ The fingerprint check (`--enable_fingerprintcheck`, on by default) needs the Pic
 --enable_fingerprintcheck \
 --fingerprint_haplotype_map /path/to/haplotype_map.txt \
 --fasta /path/to/genome.fasta \
---fingerprint_database /path/to/previous/exomeqc_fingerprint_database.vcf.gz
+--fingerprint_database /path/to/previous/sequencingqc_fingerprint_database.vcf.gz
 ```
 
 It runs two checks:
@@ -320,13 +320,13 @@ A sample is `PASS` when the fraction of passing sites (and, with the contaminati
 The QC result is stored with the fingerprint and travels with it into every later database:
 
 - per site in the fingerprint VCF: `FT`, `FPDP`, `FPAD` (REF and ALT bases counted in `FPDP`) and `FPBQ`;
-- per fingerprint as VCF header line `##SAMPLE=<ID=<sample>@<runid>,ExomeqcFingerprintQC=PASS|FAIL,FailedCriteria=...,QCDate=YYYY-MM-DD,ExomeqcVersion=...,HaplotypeSites=...,PassingSites=...,FractionPassingSites=...,SitesLowDepth=...,SitesLowBaseQuality=...,SitesNoLikelihoods=...,MeanSiteDepth=...,MeanSiteBaseQuality=...,Contamination=...,ContaminationSites=...,MinBaseQuality=...,MinMappingQuality=...,MinSiteDepth=...,MinSiteMeanBaseQuality=...,MinFractionPassingSites=...,MaxContamination=...>`, i.e. the status, the observed values and the thresholds used, so fingerprints of runs with different settings can be compared.
+- per fingerprint as VCF header line `##SAMPLE=<ID=<sample>@<runid>,SequencingqcFingerprintQC=PASS|FAIL,FailedCriteria=...,QCDate=YYYY-MM-DD,SequencingqcVersion=...,HaplotypeSites=...,PassingSites=...,FractionPassingSites=...,SitesLowDepth=...,SitesLowBaseQuality=...,SitesNoLikelihoods=...,MeanSiteDepth=...,MeanSiteBaseQuality=...,Contamination=...,ContaminationSites=...,MinBaseQuality=...,MinMappingQuality=...,MinSiteDepth=...,MinSiteMeanBaseQuality=...,MinFractionPassingSites=...,MaxContamination=...>`, i.e. the status, the observed values and the thresholds used, so fingerprints of runs with different settings can be compared.
 
-The updated database has exactly one such line per fingerprint (`FINGERPRINT_DATABASE_HEADER` and `BCFTOOLS_REHEADER_FINGERPRINT_DATABASE`; bcftools merge alone would keep outdated lines of replaced fingerprints). Fingerprints added before the fingerprint QC existed get `ExomeqcFingerprintQC=NOT_RECORDED`, logged as `WARNING`. The MultiQC section "Fingerprint QC" shows status, failed criteria, values and thresholds of each sample of this run; the database matches show the QC status of both fingerprints of a comparison (`QC`, `Database QC`).
+The updated database has exactly one such line per fingerprint (`FINGERPRINT_DATABASE_HEADER` and `BCFTOOLS_REHEADER_FINGERPRINT_DATABASE`; bcftools merge alone would keep outdated lines of replaced fingerprints). Fingerprints added before the fingerprint QC existed get `SequencingqcFingerprintQC=NOT_RECORDED`, logged as `WARNING`. The MultiQC section "Fingerprint QC" shows status, failed criteria, values and thresholds of each sample of this run; the database matches show the QC status of both fingerprints of a comparison (`QC`, `Database QC`).
 
 #### Updated fingerprint database
 
-The updated database is written to `fingerprintcheck/database/exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` (with `.tbi`). The timestamp is the start time of the pipeline run (system time), so the databases of successive runs do not overwrite each other. Pass it as `--fingerprint_database` to the next run so the database grows with every run. Keep the haplotype map and reference the same for all runs of one database.
+The updated database is written to `fingerprintcheck/database/sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` (with `.tbi`). The timestamp is the start time of the pipeline run (system time), so the databases of successive runs do not overwrite each other. Pass it as `--fingerprint_database` to the next run so the database grows with every run. Keep the haplotype map and reference the same for all runs of one database.
 
 > [!WARNING]
 > **Fingerprints with the same sample AND run ID are dropped and replaced.** If the given database already contains a fingerprint with the same `<sample>@<runid>` as a sample of this run (e.g. when a run is analysed again), that old fingerprint is **dropped** from the updated database and **replaced** by the new fingerprint of this run. The old fingerprint is not kept anywhere in the updated database and is not compared with this run. This is logged as a `WARNING`, listed in the overview section of the MultiQC report, marked `replace` in `fingerprintcheck/database/previous_database_samples.tsv` and counted as `replaced_fingerprints`. Fingerprints of the same sample from _other_ runs are kept. Keep the given database file if the old fingerprints may be needed again.
@@ -335,7 +335,7 @@ The updated database is written to `fingerprintcheck/database/exomeqc_fingerprin
 
 `CHECK_FINGERPRINT_DATABASE` (`bin/check_fingerprint_database.py`, PyVCF) reads the whole database and stops the pipeline with an `ERROR` that names the file, the record and the expected and observed values unless:
 
-- all sample names are unique and of the form `<sample>@<runid>` (i.e. the database was created by exomeqc);
+- all sample names are unique and of the form `<sample>@<runid>` (i.e. the database was created by sequencingqc);
 - every `##contig` of the VCF header is in the sequence dictionary (`@SQ` lines) of the haplotype map, with the same length;
 - `FORMAT/PL` (genotype likelihoods, read by Picard) is defined and every genotype has 3 PL values or is missing;
 - every record is an SNP of the haplotype map, at the same position and with the same two alleles (`REF`/`ALT` = `MAJOR_ALLELE`/`MINOR_ALLELE` in either order);
@@ -540,7 +540,7 @@ on small regions:
   >= 10, self LOD 9.1 and 7.6, `SUITABLE`). The exome samples (6 blocks with reads, 2 passing
   sites, self LOD 2.0 and 1.4) are `INSUFFICIENT`, the panel samples `NO_COVERAGE`; all four
   get QC `FAIL` (logged as `WARNING`) and are still added to the database. No database is
-  given, so the updated database `exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` holds
+  given, so the updated database `sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` holds
   the six fingerprints of this run.
 - **Same tissue across assays matches:** tumor exome vs tumor genome LOD +2.1, normal exome
   vs normal genome LOD +0.4.

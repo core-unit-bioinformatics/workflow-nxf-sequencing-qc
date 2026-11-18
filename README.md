@@ -31,7 +31,7 @@ existing pipeline output (for example DRAGEN, Picard or mosdepth) into one repor
 | Contamination / species screen          | [FastQ Screen](https://www.bioinformatics.babraham.ac.uk/projects/fastq_screen/)                                                                                                                        | FASTQ (single- or paired-end)             | panel, exome, genome   | on      |
 | CNV QC (purity, ploidy, noise, plots)   | `bin/analyze_cnv_metrics.R` + [karyoploteR](https://bioconductor.org/packages/karyoploteR/)                                                                                                             | **DRAGEN** CNV caller output              | exome, genome\*\*      | on      |
 | VAF histogram                           | `bin/vaf_histogram.py`                                                                                                                                                                                  | small-variant VCF (any caller)            | panel, exome, genome   | off     |
-| Report summary (CNV QC, TMB, MSI, HRD)  | `bin/exomeqc_summary.py`                                                                                                                                                                                | **DRAGEN** output, CNV and fingerprint QC | panel, exome, genome   | on      |
+| Report summary (CNV QC, TMB, MSI, HRD)  | `bin/sequencingqc_summary.py`                                                                                                                                                                           | **DRAGEN** output, CNV and fingerprint QC | panel, exome, genome   | on      |
 | Aggregated report                       | [MultiQC](https://multiqc.info/)                                                                                                                                                                        | all of the above + extra directories      | panel, exome, genome   | always  |
 
 \* see [Restrictions](#restrictions). \*\* any assay DRAGEN somatic CNV calling supports.
@@ -50,7 +50,7 @@ The steps in detail:
    - fingerprint QC: depth and base quality of each haplotype site with adjustable thresholds ([`samtools mpileup`](https://www.htslib.org/)), optional contamination estimate (off by default, not suited for tumours), QC status per sample; failed sites are masked and status, thresholds and values are stored in the fingerprint ([`bcftools`](https://samtools.github.io/bcftools/))
    - check the fingerprint database of previous runs (`--fingerprint_database`, plain VCF, gzip or bgzip) against the haplotype map ([`PyVCF3`](https://github.com/dridk/PyVCF3)), drop the fingerprints this run replaces (same `<sample>@<runid>`) and convert it to bgzip with index ([`bcftools`](https://samtools.github.io/bcftools/))
    - crosscheck the run against the database, before the run is added, and report matches with samples of other runs, with LOD scores
-   - add the run to the database: updated database `exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` for the next run
+   - add the run to the database: updated database `sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` for the next run
    - overview in MultiQC: haplotype map, database, replaced fingerprints and whether each sample gave a suitable fingerprint
 2. Contamination screening ([`FastQ Screen`](https://www.bioinformatics.babraham.ac.uk/projects/fastq_screen/), `--enable_fastqscreen`)
 3. DRAGEN CNV QC (`--enable_cnvqc`): QC status per sample from DRAGEN CNV metrics with adjustable thresholds, purity/coverage model plot and karyotype plots ([`karyoploteR`](https://bioconductor.org/packages/karyoploteR/))
@@ -106,7 +106,7 @@ fastqscreen_database: /path/to/FastQ_Screen_Genomes
 fingerprint_haplotype_map: /path/to/haplotype_map.txt
 fasta: /path/to/genome.fasta
 # fingerprint database of the previous run (optional)
-fingerprint_database: /path/to/previous/results/fingerprintcheck/database/exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz
+fingerprint_database: /path/to/previous/results/fingerprintcheck/database/sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz
 # DRAGEN only; leave out and set enable_cnvqc: false for other callers
 dragen_dirs: /path/to/dragen_output
 multiqc_report_name: 20260101_LH00001_0001_AXXXXXXXX

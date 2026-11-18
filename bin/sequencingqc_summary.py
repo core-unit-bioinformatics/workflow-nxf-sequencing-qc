@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) Core Unit Bioinformatics (CUBI), Medical Faculty, HHU.
 # See the LICENSE file in the repository root.
-"""Build the compact ExomeQC summary section for the top of the MultiQC report.
+"""Build the compact SequencingQC summary section for the top of the MultiQC report.
 
 Collects per case (DRAGEN output prefix):
 
@@ -21,11 +21,11 @@ three biomarkers of one DRAGEN run end up in one row.
 
 Outputs:
 
-* ``exomeqc_summary_multiqc_config.yml``  MultiQC config setting ``intro_text``
+* ``sequencingqc_summary_multiqc_config.yml``  MultiQC config setting ``intro_text``
   to the summary, so it is shown first (MultiQC always renders General
   Statistics before any custom-content section)
-* ``exomeqc_summary.html``  the same HTML fragment, standalone
-* ``exomeqc_summary.tsv``   visible summary columns, one row per case
+* ``sequencingqc_summary.html``  the same HTML fragment, standalone
+* ``sequencingqc_summary.tsv``   visible summary columns, one row per case
 * ``biomarker.tsv``         all biomarker values, one row per case
 
 No existing MultiQC module reads DRAGEN TMB/MSI/HRD files or combines them
@@ -46,7 +46,7 @@ from pathlib import Path
 __version__ = "1.0.0"
 
 NA = "n/a"
-CONFIG_NAME = "exomeqc_summary_multiqc_config.yml"
+CONFIG_NAME = "sequencingqc_summary_multiqc_config.yml"
 TMB_SUFFIX = ".tmb.metrics.csv"
 MSI_SUFFIX = ".microsat_output.json"
 HRD_SUFFIX = ".hrdscore.csv"
@@ -497,7 +497,7 @@ def write_tsv(path: Path, header: list[str], data: list[list[str]]) -> None:
 # CLI
 # --------------------------------------------------------------------------
 def log(msg: str) -> None:
-    print(f"[exomeqc_summary] {msg}", file=sys.stderr)
+    print(f"[sequencingqc_summary] {msg}", file=sys.stderr)
 
 
 def positive(value: str) -> float:
@@ -592,7 +592,7 @@ def main(argv: list[str] | None = None) -> int:
         have_cnv=bool(args.cnv_metrics),
         have_fp=bool(args.crosscheck),
     )
-    Path(f"{prefix}exomeqc_summary.html").write_text(fragment)
+    Path(f"{prefix}sequencingqc_summary.html").write_text(fragment)
     # MultiQC renders intro_text right below the title, above General Statistics;
     # JSON is valid YAML and keeps the HTML string safely quoted.
     Path(f"{prefix}{CONFIG_NAME}").write_text(
@@ -600,7 +600,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     keys = ["case", "cnv_qc", "purity", "ploidy", "tmb", "msi", "hrd"]
     write_tsv(
-        Path(f"{prefix}exomeqc_summary.tsv"),
+        Path(f"{prefix}sequencingqc_summary.tsv"),
         ["sample"] + keys[1:],
         [[r[k] for k in keys] for r in rows],
     )

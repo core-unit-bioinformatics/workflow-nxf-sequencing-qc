@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT — see LICENSE in the repository root (CUBI, HHU)
-"""Unit tests for bin/exomeqc_summary.py (run: pytest tests/bin)."""
+"""Unit tests for bin/sequencingqc_summary.py (run: pytest tests/bin)."""
 
 import csv
 import importlib.util
@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "tests" / "fixtures" / "summary"
 
 spec = importlib.util.spec_from_file_location(
-    "exomeqc_summary", ROOT / "bin" / "exomeqc_summary.py"
+    "sequencingqc_summary", ROOT / "bin" / "sequencingqc_summary.py"
 )
 es = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(es)
@@ -40,7 +40,7 @@ def run(tmp_path, monkeypatch, *extra):
 
 def test_full_run(tmp_path, monkeypatch):
     assert run(tmp_path, monkeypatch, "--tmb-high", "10", "--msi-high", "20") == 0
-    rows = {r["sample"]: r for r in read_tsv(tmp_path / "exomeqc_summary.tsv")}
+    rows = {r["sample"]: r for r in read_tsv(tmp_path / "sequencingqc_summary.tsv")}
     assert list(rows) == ["caseA", "caseB", "caseC"]
     assert rows["caseA"] == {
         "sample": "caseA",
@@ -56,7 +56,7 @@ def test_full_run(tmp_path, monkeypatch):
     assert rows["caseC"]["msi"] == "1.1 (invalid)"
     assert rows["caseC"]["hrd"] == "n/a"
 
-    html = (tmp_path / "exomeqc_summary.html").read_text()
+    html = (tmp_path / "sequencingqc_summary.html").read_text()
     assert html.startswith("\n<style>") and 'id="exsum"' in html
     cfg = json.loads((tmp_path / es.CONFIG_NAME).read_text())
     assert cfg == {"intro_text": html}
@@ -83,7 +83,7 @@ def test_biomarker_columns_match_diag_layout(tmp_path, monkeypatch):
 
 def test_no_threshold_no_highlight(tmp_path, monkeypatch):
     run(tmp_path, monkeypatch)
-    html = (tmp_path / "exomeqc_summary.html").read_text()
+    html = (tmp_path / "sequencingqc_summary.html").read_text()
     assert 'class="num exs-hi"' not in html
 
 
@@ -100,7 +100,7 @@ def test_invalid_msi_not_highlighted(tmp_path, monkeypatch):
 def test_dragen_only(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     assert es.main(["--dragen", str(DATA / "dragen")]) == 0
-    html = (tmp_path / "exomeqc_summary.html").read_text()
+    html = (tmp_path / "sequencingqc_summary.html").read_text()
     assert "CNV QC" not in html
     assert "Fingerprint" not in html
 
@@ -109,7 +109,7 @@ def test_empty_dragen_dir(tmp_path, monkeypatch):
     (tmp_path / "empty").mkdir()
     monkeypatch.chdir(tmp_path)
     assert es.main(["--dragen", str(tmp_path / "empty")]) == 0
-    assert "0 cases" in (tmp_path / "exomeqc_summary.html").read_text()
+    assert "0 cases" in (tmp_path / "sequencingqc_summary.html").read_text()
 
 
 def test_duplicate_case_fails(tmp_path, monkeypatch, capsys):
@@ -153,5 +153,5 @@ def test_html_escaping(tmp_path, monkeypatch):
     (d / "<b>.tmb.metrics.csv").write_text("TMB SUMMARY,,TMB,1\n")
     monkeypatch.chdir(tmp_path)
     es.main(["--dragen", str(d)])
-    html = (tmp_path / "exomeqc_summary.html").read_text()
+    html = (tmp_path / "sequencingqc_summary.html").read_text()
     assert "&lt;b&gt;" in html and "<b>" not in html

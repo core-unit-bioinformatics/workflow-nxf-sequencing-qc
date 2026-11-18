@@ -13,8 +13,8 @@ keywords:
   - qc
 tools:
   - "check_fingerprint_database.py":
-      description: "exomeqc script (bin/) that checks a fingerprint database against the haplotype map with PyVCF"
-      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
+      description: "sequencingqc script (bin/) that checks a fingerprint database against the haplotype map with PyVCF"
+      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-sequencing-qc"
       licence: ["MIT"]
       identifier: ""
 input:

@@ -92,7 +92,7 @@
                     "format": "file-path",
                     "exists": true,
                     "pattern": "^\\S+\\.vcf(\\.gz)?$",
-                    "description": "Fingerprint database of previous exomeqc runs (`fingerprintcheck/database/exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz`).",
+                    "description": "Fingerprint database of previous sequencingqc runs (`fingerprintcheck/database/sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz`).",
                     "help_text": "Optional. Plain VCF, gzip or bgzip; an index is not needed (a new one is made). Checked against `--fingerprint_haplotype_map` first; a database of another haplotype map or reference stops the run with an ERROR. WARNING: fingerprints with the same sample AND run ID (`<sample>@<runid>`) as a sample of this run are dropped and replaced by the new ones. This run is compared with the remaining fingerprints, then added to them; the result is written as the new database. The given file is not modified."
                 },
                 "fingerprint_database_lod_threshold": {

@@ -52,7 +52,7 @@ def args_for(**overrides):
         "--fingerprint-id": FINGERPRINT_ID,
         **THRESHOLDS,
         "--qc-date": "2026-01-01",
-        "--exomeqc-version": "1.1.1",
+        "--sequencingqc-version": "1.1.1",
         "--prefix": "out",
     }
     values.update(overrides)
@@ -167,7 +167,7 @@ def test_clean_sample_passes(scenario):
     header = Path("out_header.txt").read_text().splitlines()
     sample_line = header[-1]
     assert sample_line.startswith(
-        f"##SAMPLE=<ID={FINGERPRINT_ID},ExomeqcFingerprintQC=PASS,"
+        f"##SAMPLE=<ID={FINGERPRINT_ID},SequencingqcFingerprintQC=PASS,"
     )
     for key in [
         "MinSiteDepth=10",
@@ -286,7 +286,7 @@ def test_reference_mismatch_fails(scenario, capsys):
         ("--max-contamination", "0.7"),
         ("--min-fraction-passing-sites", "1.5"),
         ("--qc-date", "17.11.2026"),
-        ("--exomeqc-version", "1.0 dev"),
+        ("--sequencingqc-version", "1.0 dev"),
     ],
 )
 def test_invalid_options_fail(scenario, capsys, option, value):

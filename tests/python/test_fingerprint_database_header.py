@@ -14,7 +14,7 @@ REPLACED = fid("SYN003_1-T", RUN_B)
 
 
 def qc_line(fingerprint_id, status, run="new"):
-    return f"##SAMPLE=<ID={fingerprint_id},ExomeqcFingerprintQC={status},QCDate={run}>"
+    return f"##SAMPLE=<ID={fingerprint_id},SequencingqcFingerprintQC={status},QCDate={run}>"
 
 
 def database_text(samples, sample_lines):
@@ -68,7 +68,7 @@ def test_one_qc_line_per_fingerprint_in_column_order(scenario, capsys):
     header.main(scenario)
     assert sample_lines() == [
         qc_line(OLD, "PASS", "old"),
-        f"##SAMPLE=<ID={KEPT_LEGACY},ExomeqcFingerprintQC=NOT_RECORDED>",
+        f"##SAMPLE=<ID={KEPT_LEGACY},SequencingqcFingerprintQC=NOT_RECORDED>",
         qc_line(NEW, "PASS"),
         qc_line(REPLACED, "PASS"),
     ]

@@ -31,7 +31,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
   - `qc/<sample>_<runid>.fingerprint_qc_summary.tsv`: fingerprint QC of the sample, one row with the columns of `fingerprint_database_qc.tsv` (see below).
   - `qc/<sample>_<runid>.fingerprint_qc_sites.tsv`: QC of each haplotype site: `#CHROM`, `POS`, `REF`, `ALT`, `FT`, `FPDP`, `FPAD`, `FPBQ`, `PL` (as written into the fingerprint).
   - `database/`
-    - `exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` (+ `.tbi`): updated fingerprint database, named with the start time of the pipeline run: the kept fingerprints of the given `--fingerprint_database` (all except those replaced by this run, see the warning in [usage](usage.md#updated-fingerprint-database)) and all fingerprints of this run; the sample order follows the input file names of bcftools merge. Each fingerprint keeps its site QC fields and has exactly one `##SAMPLE` header line with its QC status, values and thresholds (`ExomeqcFingerprintQC=NOT_RECORDED` for fingerprints added before the fingerprint QC existed). Use it as `--fingerprint_database` of the next run.
+    - `sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz` (+ `.tbi`): updated fingerprint database, named with the start time of the pipeline run: the kept fingerprints of the given `--fingerprint_database` (all except those replaced by this run, see the warning in [usage](usage.md#updated-fingerprint-database)) and all fingerprints of this run; the sample order follows the input file names of bcftools merge. Each fingerprint keeps its site QC fields and has exactly one `##SAMPLE` header line with its QC status, values and thresholds (`SequencingqcFingerprintQC=NOT_RECORDED` for fingerprints added before the fingerprint QC existed). Use it as `--fingerprint_database` of the next run.
     - `previous_database_check.tsv` (only with `--fingerprint_database`): result of the check of the given database against the haplotype map (`metric`, `value`): `database_file`, `database_compression` (`plain`, `gzip` or `bgzip`), `database_samples`, `database_runs`, `database_sites`, `database_missing_genotypes`, `haplotype_map_snps`, `haplotype_map_blocks`, `replaced_fingerprints`, `kept_fingerprints`.
     - `previous_database_samples.tsv` (only with `--fingerprint_database`): every fingerprint of the given database: `fingerprint_id`, `sample`, `runid`, `action` (`keep`, or `replace` when this run has a fingerprint with the same `<sample>@<runid>`).
     - `fingerprint_database.crosscheck_metrics.txt` (only when the given database has kept fingerprints): Picard CrosscheckFingerprints of this run's fingerprints against the kept database fingerprints, before this run was added (all pairs). Not read by MultiQC's Picard module.
@@ -94,7 +94,7 @@ Columns of `fingerprint_database_qc.tsv` (one row per sample of this run; the sa
 | `fingerprint_id`, `sample`, `runid`                                                     | `<sample>@<runid>`, sample and run                                                                                           |
 | `status`                                                                                | `PASS` or `FAIL`                                                                                                             |
 | `failed_criteria`                                                                       | `FractionPassingSites` and/or `Contamination` separated by `\|`, `.` if none                                                 |
-| `qc_date`, `exomeqc_version`                                                            | Start date of the run (`YYYY-MM-DD`) and pipeline version                                                                    |
+| `qc_date`, `sequencingqc_version`                                                       | Start date of the run (`YYYY-MM-DD`) and pipeline version                                                                    |
 | `haplotype_sites`, `passing_sites`, `fraction_passing_sites`                            | Haplotype sites of the fingerprint, sites that pass, and their fraction                                                      |
 | `sites_low_depth`, `sites_low_base_quality`, `sites_no_likelihoods`                     | Sites with the filters `FpLowDepth`, `FpLowBaseQuality`, `FpNoLikelihoods` (a site can have several)                         |
 | `mean_site_depth`, `mean_site_base_quality`                                             | Mean `FPDP` over all sites; mean `FPBQ` over the sites with reads                                                            |
@@ -153,14 +153,14 @@ The parameters are described in [usage: VAF histogram](usage.md#vaf-histogram).
 <summary>Output files</summary>
 
 - `summary/`
-  - `exomeqc_summary.html`: the **Summary** shown on top of the MultiQC report (standalone fragment).
-  - `exomeqc_summary_multiqc_config.yml`: MultiQC config that puts the summary below the report title (`intro_text`), above General Statistics.
-  - `exomeqc_summary.tsv`: compact table, one row per case.
+  - `sequencingqc_summary.html`: the **Summary** shown on top of the MultiQC report (standalone fragment).
+  - `sequencingqc_summary_multiqc_config.yml`: MultiQC config that puts the summary below the report title (`intro_text`), above General Statistics.
+  - `sequencingqc_summary.tsv`: compact table, one row per case.
   - `biomarker.tsv`: all DRAGEN TMB, MSI and HRD values per case.
 
 </details>
 
-`exomeqc_summary.tsv` columns:
+`sequencingqc_summary.tsv` columns:
 
 | Column   | Description                                                                                    |
 | -------- | ---------------------------------------------------------------------------------------------- |

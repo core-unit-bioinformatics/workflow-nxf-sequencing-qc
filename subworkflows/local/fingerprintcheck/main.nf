@@ -375,13 +375,13 @@ workflow FINGERPRINTCHECK {
 
     // -------------------------------------------------------------------------
     // 2f. Add this run's fingerprints to the kept database fingerprints:
-    // updated database exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz
+    // updated database sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>.vcf.gz
     // -------------------------------------------------------------------------
     ch_merge_input = ch_fingerprint_lists
         .combine(ch_previous_for_merge)
         .map { vcfs, tbis, previous_vcfs, previous_tbis ->
             // bcftools/merge orders the files by name, which sets the sample order
-            [ [ id: "exomeqc_fingerprint_database_${database_timestamp}".toString() ], previous_vcfs + vcfs, previous_tbis + tbis, [] ]
+            [ [ id: "sequencingqc_fingerprint_database_${database_timestamp}".toString() ], previous_vcfs + vcfs, previous_tbis + tbis, [] ]
         }
 
     BCFTOOLS_MERGE_FINGERPRINT_DATABASE(ch_merge_input, [ [:], [], [] ])

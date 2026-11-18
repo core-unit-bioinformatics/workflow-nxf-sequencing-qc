@@ -8,7 +8,7 @@ include { FASTQSCREEN_FASTQSCREEN } from '../modules/nf-core/fastqscreen/fastqsc
 include { UNTAR                   } from '../modules/nf-core/untar/main'
 include { DRAGEN_CNV_QC           } from '../modules/local/dragen_cnv_qc/main'
 include { VAF_HISTOGRAM           } from '../modules/local/vaf_histogram/main'
-include { EXOMEQC_SUMMARY         } from '../modules/local/exomeqc_summary/main'
+include { SEQUENCINGQC_SUMMARY    } from '../modules/local/sequencingqc_summary/main'
 include { FINGERPRINTCHECK        } from '../subworkflows/local/fingerprintcheck/main'
 include { samplesheetToList       } from 'plugin/nf-schema'
 include { paramsSummaryMap        } from 'plugin/nf-schema'
@@ -168,13 +168,13 @@ workflow SEQUENCINGQC {
                     .ifEmpty([]) :
                 channel.value([])
 
-            EXOMEQC_SUMMARY(
+            SEQUENCINGQC_SUMMARY(
                 channel.fromPath(params.dragen_dirs, type: 'dir', checkIfExists: true).collect(),
                 ch_summary_cnv,
                 ch_summary_fp
             )
             // passed as the last MultiQC config: sets intro_text (top of report)
-            ch_summary_mqc_config = EXOMEQC_SUMMARY.out.multiqc_config
+            ch_summary_mqc_config = SEQUENCINGQC_SUMMARY.out.multiqc_config
         }
     }
 
@@ -234,7 +234,7 @@ workflow SEQUENCINGQC {
         .toList()
     MULTIQC(
         ch_multiqc_files.flatten().collect()
-            .map { files -> [ [id: 'exomeqc'], files ] }
+            .map { files -> [ [id: 'sequencingqc'], files ] }
             .combine(ch_multiqc_configs.map { configs -> [ configs ] })
             .map { meta, files, configs ->
                 [

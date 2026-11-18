@@ -1,4 +1,4 @@
-name: "exomeqc_summary"
+name: "sequencingqc_summary"
 description: >-
   Compact per-case summary (CNV QC, purity, ploidy, TMB, MSI, HRD) and
   run-level fingerprint status for the top of the MultiQC report.
@@ -10,9 +10,9 @@ keywords:
   - hrd
   - multiqc
 tools:
-  - "exomeqc_summary.py":
+  - "sequencingqc_summary.py":
       description: "Pipeline script in bin/ combining DRAGEN biomarkers with QC results."
-      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
+      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-sequencing-qc"
       licence: ["MIT"]
 input:
   - dragen_dirs:
@@ -30,17 +30,17 @@ input:
       pattern: "*.crosscheck_metrics.txt"
 output:
   - multiqc_config:
-      - "*exomeqc_summary_multiqc_config.yml":
+      - "*sequencingqc_summary_multiqc_config.yml":
           type: file
           description: >-
             MultiQC config setting intro_text to the summary, so it is shown
             right below the report title (above General Statistics).
   - html:
-      - "*exomeqc_summary.html":
+      - "*sequencingqc_summary.html":
           type: file
           description: The summary HTML fragment, standalone.
   - tsv:
-      - "*exomeqc_summary.tsv":
+      - "*sequencingqc_summary.tsv":
           type: file
           description: Compact summary, one row per case.
   - biomarker:

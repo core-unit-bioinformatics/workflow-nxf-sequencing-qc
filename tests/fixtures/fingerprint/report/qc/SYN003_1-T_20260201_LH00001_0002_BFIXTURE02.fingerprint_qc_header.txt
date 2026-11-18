@@ -1,8 +1,8 @@
-##FORMAT=<ID=FT,Number=1,Type=String,Description="exomeqc fingerprint QC of the site: PASS or the failed filters (FpLowDepth, FpLowBaseQuality, FpNoLikelihoods); PL of failed sites is set to 0,0,0">
-##FORMAT=<ID=FPDP,Number=1,Type=Integer,Description="exomeqc fingerprint QC: bases with base and mapping quality at least MinBaseQuality and MinMappingQuality of the ##SAMPLE line">
-##FORMAT=<ID=FPAD,Number=R,Type=Integer,Description="exomeqc fingerprint QC: REF and ALT bases counted in FPDP">
-##FORMAT=<ID=FPBQ,Number=1,Type=Float,Description="exomeqc fingerprint QC: mean base quality of the bases with mapping quality at least MinMappingQuality">
-##FILTER=<ID=FpLowDepth,Description="exomeqc fingerprint QC: FPDP below MinSiteDepth of the ##SAMPLE line">
-##FILTER=<ID=FpLowBaseQuality,Description="exomeqc fingerprint QC: FPBQ below MinSiteMeanBaseQuality of the ##SAMPLE line">
-##FILTER=<ID=FpNoLikelihoods,Description="exomeqc fingerprint QC: no genotype likelihoods (PL) in the fingerprint">
-##SAMPLE=<ID=SYN003_1-T@20260201_LH00001_0002_BFIXTURE02,ExomeqcFingerprintQC=PASS,FailedCriteria=.,QCDate=2026-01-01,ExomeqcVersion=1.0.0,HaplotypeSites=100,PassingSites=100,FractionPassingSites=1.000,SitesLowDepth=0,SitesLowBaseQuality=0,SitesNoLikelihoods=0,MeanSiteDepth=25.4,MeanSiteBaseQuality=37.0,Contamination=0.0000,ContaminationSites=100,MinBaseQuality=20,MinMappingQuality=20,MinSiteDepth=10,MinSiteMeanBaseQuality=25,MinFractionPassingSites=0.5,MaxContamination=0.03>
+##FORMAT=<ID=FT,Number=1,Type=String,Description="sequencingqc fingerprint QC of the site: PASS or the failed filters (FpLowDepth, FpLowBaseQuality, FpNoLikelihoods); PL of failed sites is set to 0,0,0">
+##FORMAT=<ID=FPDP,Number=1,Type=Integer,Description="sequencingqc fingerprint QC: bases with base and mapping quality at least MinBaseQuality and MinMappingQuality of the ##SAMPLE line">
+##FORMAT=<ID=FPAD,Number=R,Type=Integer,Description="sequencingqc fingerprint QC: REF and ALT bases counted in FPDP">
+##FORMAT=<ID=FPBQ,Number=1,Type=Float,Description="sequencingqc fingerprint QC: mean base quality of the bases with mapping quality at least MinMappingQuality">
+##FILTER=<ID=FpLowDepth,Description="sequencingqc fingerprint QC: FPDP below MinSiteDepth of the ##SAMPLE line">
+##FILTER=<ID=FpLowBaseQuality,Description="sequencingqc fingerprint QC: FPBQ below MinSiteMeanBaseQuality of the ##SAMPLE line">
+##FILTER=<ID=FpNoLikelihoods,Description="sequencingqc fingerprint QC: no genotype likelihoods (PL) in the fingerprint">
+##SAMPLE=<ID=SYN003_1-T@20260201_LH00001_0002_BFIXTURE02,SequencingqcFingerprintQC=PASS,FailedCriteria=.,QCDate=2026-01-01,SequencingqcVersion=1.0.0,HaplotypeSites=100,PassingSites=100,FractionPassingSites=1.000,SitesLowDepth=0,SitesLowBaseQuality=0,SitesNoLikelihoods=0,MeanSiteDepth=25.4,MeanSiteBaseQuality=37.0,Contamination=0.0000,ContaminationSites=100,MinBaseQuality=20,MinMappingQuality=20,MinSiteDepth=10,MinSiteMeanBaseQuality=25,MinFractionPassingSites=0.5,MaxContamination=0.03>

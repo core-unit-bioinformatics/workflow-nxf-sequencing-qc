@@ -19,7 +19,7 @@ nextflow_process {
                 """
                 def report = "${projectDir}/tests/fixtures/fingerprint/report"
                 def run_b = '20260201_LH00001_0002_BFIXTURE02'
-                input[0] = [ [ id:'exomeqc_fingerprint_database' ], file("\${report}/database.vcf.gz", checkIfExists: true) ]
+                input[0] = [ [ id:'sequencingqc_fingerprint_database' ], file("\${report}/database.vcf.gz", checkIfExists: true) ]
                 input[1] = [ 'SYN001_3-N', 'SYN002_1-T', 'SYN003_1-T' ].collect { sample -> file("\${report}/qc/\${sample}_\${run_b}.fingerprint_qc_header.txt", checkIfExists: true) }
                 """
             }
@@ -30,8 +30,8 @@ nextflow_process {
             assertAll(
                 { assert process.success },
                 { assert sample_lines.size() == 5 },
-                { assert sample_lines.count { line -> line.contains(',ExomeqcFingerprintQC=PASS,') } == 3 },
-                { assert sample_lines.count { line -> line.endsWith(',ExomeqcFingerprintQC=NOT_RECORDED>') } == 2 },
+                { assert sample_lines.count { line -> line.contains(',SequencingqcFingerprintQC=PASS,') } == 3 },
+                { assert sample_lines.count { line -> line.endsWith(',SequencingqcFingerprintQC=NOT_RECORDED>') } == 2 },
                 { assert snapshot(
                     process.out.header,
                     process.out.findAll { key, val -> key.startsWith('versions') }
@@ -48,7 +48,7 @@ nextflow_process {
                 def report = "${projectDir}/tests/fixtures/fingerprint/report"
                 def run_b = '20260201_LH00001_0002_BFIXTURE02'
                 // the database of run A holds none of the run B fingerprints
-                input[0] = [ [ id:'exomeqc_fingerprint_database' ], file("\${report}/previous_database.vcf.gz", checkIfExists: true) ]
+                input[0] = [ [ id:'sequencingqc_fingerprint_database' ], file("\${report}/previous_database.vcf.gz", checkIfExists: true) ]
                 input[1] = [ file("\${report}/qc/SYN001_3-N_\${run_b}.fingerprint_qc_header.txt", checkIfExists: true) ]
                 """
             }
@@ -71,7 +71,7 @@ nextflow_process {
             process {
                 """
                 def report = "${projectDir}/tests/fixtures/fingerprint/report"
-                input[0] = [ [ id:'exomeqc_fingerprint_database' ], file("\${report}/database.vcf.gz", checkIfExists: true) ]
+                input[0] = [ [ id:'sequencingqc_fingerprint_database' ], file("\${report}/database.vcf.gz", checkIfExists: true) ]
                 input[1] = [ file("\${report}/qc/SYN001_3-N_20260201_LH00001_0002_BFIXTURE02.fingerprint_qc_header.txt", checkIfExists: true) ]
                 """
             }

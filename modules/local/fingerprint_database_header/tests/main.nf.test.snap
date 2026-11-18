@@ -5,9 +5,9 @@
                 "0": [
                     [
                         {
-                            "id": "exomeqc_fingerprint_database"
+                            "id": "sequencingqc_fingerprint_database"
                         },
-                        "exomeqc_fingerprint_database_header.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        "sequencingqc_fingerprint_database_header.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
                     ]
                 ],
                 "1": [
@@ -27,9 +27,9 @@
                 "header": [
                     [
                         {
-                            "id": "exomeqc_fingerprint_database"
+                            "id": "sequencingqc_fingerprint_database"
                         },
-                        "exomeqc_fingerprint_database_header.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        "sequencingqc_fingerprint_database_header.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
                     ]
                 ],
                 "versions_python": [
@@ -59,9 +59,9 @@
             [
                 [
                     {
-                        "id": "exomeqc_fingerprint_database"
+                        "id": "sequencingqc_fingerprint_database"
                     },
-                    "exomeqc_fingerprint_database_header.txt:md5,85b921860c36ad370d3c4ed5a66a9d02"
+                    "sequencingqc_fingerprint_database_header.txt:md5,a88aa5c4e9983d8fa37d0464fb0e49d7"
                 ]
             ],
             {

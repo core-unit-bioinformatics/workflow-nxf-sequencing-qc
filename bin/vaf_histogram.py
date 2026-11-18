@@ -350,13 +350,13 @@ def multiqc_json(histograms, bins, width, include_filtered):
         "see vaf_histogram_summary.tsv per sample. Bins are [start, end), the last bin includes VAF 1.0."
     )
     return {
-        "id": "exomeqc_vaf_histogram",
+        "id": "sequencingqc_vaf_histogram",
         "section_name": "Variant allele fraction",
         "description": description,
         "plot_type": "linegraph",
         "pconfig": {
-            "id": "exomeqc_vaf_histogram_plot",
-            "title": "ExomeQC: Variant allele fraction histogram",
+            "id": "sequencingqc_vaf_histogram_plot",
+            "title": "SequencingQC: Variant allele fraction histogram",
             "xlab": "Variant allele fraction",
             "ylab": "Number of variants",
             "xmin": 0,
