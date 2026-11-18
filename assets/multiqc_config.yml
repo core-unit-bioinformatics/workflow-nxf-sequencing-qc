@@ -41,25 +41,25 @@ report_section_order:
     order: 970
   picard:
     order: 960
-  DRAGEN:
-    order: 950
-  dragen-fastqc:
-    order: 940
-  fastq_screen:
-    order: 930
-  fastqc:
-    order: 920
-  fastp:
-    order: 910
-  bcftools:
-    order: 900
-  vep:
-    order: 890
-  exomeqc_cnv_metrics:
-    order: 880
-  exomeqc_purcov_maxmodel:
-    order: 870
   exomeqc_vaf_histogram:
+    order: 950
+  fastq_screen:
+    order: 940
+  DRAGEN:
+    order: 930
+  dragen-fastqc:
+    order: 920
+  exomeqc_cnv_metrics:
+    order: 910
+  exomeqc_purcov_maxmodel:
+    order: 900
+  fastqc:
+    order: 890
+  fastp:
+    order: 880
+  bcftools:
+    order: 870
+  vep:
     order: 860
   cio-abcd-variantinterpretation-methods-description:
     order: -10
