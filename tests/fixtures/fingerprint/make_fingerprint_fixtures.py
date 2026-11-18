@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the synthetic fingerprint test fixtures of exomeqc.
+"""Generate the synthetic fingerprint test fixtures of sequencingqc.
 
 The fixtures are fully synthetic: a random 20 kb reference contig, a Picard
 haplotype map with 100 bi-allelic SNPs, and simulated paired-end reads of four
@@ -501,7 +501,7 @@ def make_qc_fixtures(outdir):
             + ["--haplotype-map", str(outdir / "haplotype_map.txt")]
             + ["--fingerprint-id", f"{sample}@{run_id}"]
             + QC_THRESHOLDS
-            + ["--qc-date", qc_date, "--exomeqc-version", "1.0.0"]
+            + ["--qc-date", qc_date, "--sequencingqc-version", "1.0.0"]
             + ["--prefix", f"{prefix}.fingerprint_qc"],
             qc,
         )

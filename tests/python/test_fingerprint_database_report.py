@@ -73,7 +73,7 @@ def qc_summary_row(fingerprint_id, status="PASS"):
         "status": status,
         "failed_criteria": "." if status == "PASS" else "Contamination",
         "qc_date": "2026-01-01",
-        "exomeqc_version": "1.1.1",
+        "sequencingqc_version": "1.1.1",
         "haplotype_sites": "5",
         "passing_sites": "5",
         "fraction_passing_sites": "1.000",
@@ -114,7 +114,7 @@ def write_database(samples, statuses=None):
     """Write the updated database with one ##SAMPLE QC line per fingerprint."""
     statuses = statuses or {}
     lines = [
-        f"##SAMPLE=<ID={f},ExomeqcFingerprintQC={statuses.get(f, 'PASS')}>"
+        f"##SAMPLE=<ID={f},SequencingqcFingerprintQC={statuses.get(f, 'PASS')}>"
         for f in samples
     ]
     write_vcf("updated.vcf.gz", vcf_text(samples, header_lines=lines))
@@ -243,12 +243,12 @@ def test_report_with_database(scenario, capsys):
     assert summary["run_samples_suitable"] == "3"
     # the MultiQC table is written, the empty-report note is not
     mqc = Path("fingerprint_database_matches_mqc.tsv").read_text()
-    assert "# id: 'exomeqc_fingerprint_database'" in mqc
+    assert "# id: 'sequencingqc_fingerprint_database'" in mqc
     assert f"SYN003_1-T@{RUN_B} vs SYN001_3-N@{RUN_A}" in mqc
     assert not Path("fingerprint_database_matches_mqc.html").exists()
     # the overview names what was checked
     overview = Path("fingerprint_database_overview_mqc.html").read_text()
-    assert "id: 'exomeqc_fingerprint_overview'" in overview
+    assert "id: 'sequencingqc_fingerprint_overview'" in overview
     assert "5 SNPs in 5 haplotype blocks" in overview
     assert "3 samples; 3 with a suitable fingerprint" in overview
     assert "compared with 2 fingerprints of 1 other runs" in overview
@@ -480,7 +480,7 @@ def test_qc_tables_and_multiqc_section(scenario, capsys):
     )
     assert (summary["database_qc_pass"], summary["database_qc_fail"]) == ("4", "1")
     mqc = Path("fingerprint_database_qc_mqc.tsv").read_text()
-    assert "# id: 'exomeqc_fingerprint_qc'" in mqc
+    assert "# id: 'sequencingqc_fingerprint_qc'" in mqc
     assert "cond_formatting_rules" in mqc
     # the thresholds are named in the section description
     assert "is &ge; 10" in mqc and "&le; 0.03" in mqc

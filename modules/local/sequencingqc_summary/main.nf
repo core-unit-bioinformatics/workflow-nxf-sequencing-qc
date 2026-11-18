@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT — see LICENSE in the repository root (CUBI, HHU)
-process EXOMEQC_SUMMARY {
+process SEQUENCINGQC_SUMMARY {
     label 'process_single'
 
     conda "${moduleDir}/environment.yml"
@@ -13,12 +13,12 @@ process EXOMEQC_SUMMARY {
     path(crosscheck, stageAs: 'fingerprint/*')
 
     output:
-    path("*exomeqc_summary_multiqc_config.yml"), emit: multiqc_config
-    path("*exomeqc_summary.html")              , emit: html
-    path("*exomeqc_summary.tsv")               , emit: tsv
+    path("*sequencingqc_summary_multiqc_config.yml"), emit: multiqc_config
+    path("*sequencingqc_summary.html")              , emit: html
+    path("*sequencingqc_summary.tsv")               , emit: tsv
     path("*biomarker.tsv")                     , emit: biomarker
     tuple val("${task.process}"), val('python'), eval('python3 --version | sed "s/Python //"'), topic: versions, emit: versions_python
-    tuple val("${task.process}"), val('exomeqc_summary.py'), eval('exomeqc_summary.py --version'), topic: versions, emit: versions_script
+    tuple val("${task.process}"), val('sequencingqc_summary.py'), eval('sequencingqc_summary.py --version'), topic: versions, emit: versions_script
 
     when:
     task.ext.when == null || task.ext.when
@@ -30,7 +30,7 @@ process EXOMEQC_SUMMARY {
     def cnv    = cnv_metrics ? "--cnv-metrics ${[cnv_metrics].flatten().join(' ')}" : ''
     def fp     = crosscheck  ? "--crosscheck ${[crosscheck].flatten().join(' ')}"   : ''
     """
-    exomeqc_summary.py \\
+    sequencingqc_summary.py \\
         --dragen ${[dragen_dirs].flatten().join(' ')} \\
         ${cnv} \\
         ${fp} \\
@@ -41,9 +41,9 @@ process EXOMEQC_SUMMARY {
     stub:
     def prefix = task.ext.prefix ?: ''
     """
-    echo '{}' > ${prefix}exomeqc_summary_multiqc_config.yml
-    touch ${prefix}exomeqc_summary.html
-    touch ${prefix}exomeqc_summary.tsv
+    echo '{}' > ${prefix}sequencingqc_summary_multiqc_config.yml
+    touch ${prefix}sequencingqc_summary.html
+    touch ${prefix}sequencingqc_summary.tsv
     touch ${prefix}biomarker.tsv
     """
 }

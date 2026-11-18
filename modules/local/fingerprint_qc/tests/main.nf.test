@@ -39,7 +39,7 @@ nextflow_process {
                 { assert values.passing_sites == '100' },
                 { assert values.contamination == '0.0000' },
                 { assert values.min_site_depth == '10' },
-                { assert path(process.out.header[0][1]).readLines().last().startsWith('##SAMPLE=<ID=SYN001_3-N@20260201_LH00001_0002_BFIXTURE02,ExomeqcFingerprintQC=PASS,') },
+                { assert path(process.out.header[0][1]).readLines().last().startsWith('##SAMPLE=<ID=SYN001_3-N@20260201_LH00001_0002_BFIXTURE02,SequencingqcFingerprintQC=PASS,') },
                 { assert path(process.out.sites[0][1]).readLines().size() == 101 },
                 { assert snapshot(
                     process.out.sites,

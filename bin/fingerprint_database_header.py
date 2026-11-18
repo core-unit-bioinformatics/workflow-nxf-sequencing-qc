@@ -14,7 +14,7 @@ outdated QC lines. This script writes the header for bcftools reheader:
         * a fingerprint of an earlier run: its QC line from the merged
           database
         * a fingerprint without QC line (database created before the QC):
-          ##SAMPLE=<ID=...,ExomeqcFingerprintQC=NOT_RECORDED>, logged as
+          ##SAMPLE=<ID=...,SequencingqcFingerprintQC=NOT_RECORDED>, logged as
           WARNING and counted
     - ##SAMPLE lines of IDs that are not in the database are left out
 

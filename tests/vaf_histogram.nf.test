@@ -45,7 +45,7 @@ nextflow_pipeline {
                 { assert workflow.success },
                 // one histogram per sample with a VCF, VAF source chosen per VCF
                 { assert summary.collect { row -> [ row[0], row[1], row[3] ] } == [ [ 'VAFG03', 'VAFG03', 'FORMAT_AD' ], [ 'VAFT01', 'VAFT01-T', 'FORMAT_AF' ] ] },
-                { assert multiqc_data.list().findAll { name -> name.startsWith('multiqc_exomeqc_vaf_histogram_plot') }.size() == 2 },
+                { assert multiqc_data.list().findAll { name -> name.startsWith('multiqc_sequencingqc_vaf_histogram_plot') }.size() == 2 },
                 { assert path("${outputDir}/multiqc/Exome-Sequencing_multiqc_report.html").text.contains('Variant allele fraction') },
                 { assert snapshot(
                     // versions without the Nextflow version (tested on several Nextflow versions)

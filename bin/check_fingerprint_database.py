@@ -2,7 +2,7 @@
 """Check a fingerprint database against the haplotype map of this run.
 
 The fingerprint database (--fingerprint_database) is a multi-sample VCF
-written by exomeqc: Picard ExtractFingerprint fingerprints of earlier runs,
+written by sequencingqc: Picard ExtractFingerprint fingerprints of earlier runs,
 merged with bcftools. Its fingerprints can only be compared with this run's
 fingerprints if both were made with the same haplotype map on the same
 reference. This script reads the database with PyVCF and stops with an ERROR
@@ -111,7 +111,7 @@ def split_fingerprint_id(fingerprint_id, source):
         fail(
             f"{source}: fingerprint ID '{fingerprint_id}' is not of the form "
             f"<sample>{ID_SEPARATOR}<runid> with sample and runid made of [A-Za-z0-9._-]; "
-            "fingerprint databases must be created by exomeqc"
+            "fingerprint databases must be created by sequencingqc"
         )
     return parts[0], parts[1]
 
@@ -288,7 +288,7 @@ def check_vcf_against_map(path, haplotype_map):
     # the header contigs must be those of the reference the map was made for
     if not reader.contigs:
         fail(
-            f"{path}: no ##contig lines in the VCF header; fingerprint databases must be created by exomeqc"
+            f"{path}: no ##contig lines in the VCF header; fingerprint databases must be created by sequencingqc"
         )
     for contig in reader.contigs.values():
         if contig.id not in haplotype_map.contigs:

@@ -1,12 +1,12 @@
 nextflow_process {
 
-    name "Test Process EXOMEQC_SUMMARY"
+    name "Test Process SEQUENCINGQC_SUMMARY"
     script "../main.nf"
-    process "EXOMEQC_SUMMARY"
+    process "SEQUENCINGQC_SUMMARY"
 
     tag "modules"
     tag "modules_local"
-    tag "exomeqc_summary"
+    tag "sequencingqc_summary"
 
     test("synthetic dragen + cnv + fingerprint") {
 

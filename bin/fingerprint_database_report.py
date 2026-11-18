@@ -138,9 +138,9 @@ FINGERPRINT_COLUMNS = [
     "status",
     "fingerprint_qc",
 ]
-MQC_ID = "exomeqc_fingerprint_database"
-MQC_OVERVIEW_ID = "exomeqc_fingerprint_overview"
-MQC_QC_ID = "exomeqc_fingerprint_qc"
+MQC_ID = "sequencingqc_fingerprint_database"
+MQC_OVERVIEW_ID = "sequencingqc_fingerprint_overview"
+MQC_QC_ID = "sequencingqc_fingerprint_qc"
 QC_STATUSES = ["PASS", "FAIL", NOT_RECORDED]
 
 
@@ -495,7 +495,7 @@ def write_mqc_table(path, reported, summary, threshold):
         "plot_type: 'table'",
         "pconfig:",
         f"    id: {yaml_quote(MQC_ID + '_table')}",
-        f"    title: {yaml_quote('ExomeQC: fingerprint database matches')}",
+        f"    title: {yaml_quote('SequencingQC: fingerprint database matches')}",
         f"    col1_header: {yaml_quote('Comparison')}",
         "    sort_rows: false",
         "headers:",
@@ -789,7 +789,7 @@ def write_qc_mqc_table(path, qc_summaries):
         "plot_type: 'table'",
         "pconfig:",
         f"    id: {yaml_quote(MQC_QC_ID + '_table')}",
-        f"    title: {yaml_quote('ExomeQC: fingerprint QC')}",
+        f"    title: {yaml_quote('SequencingQC: fingerprint QC')}",
         f"    col1_header: {yaml_quote('Fingerprint')}",
         "headers:",
         "    status:",
@@ -849,7 +849,7 @@ def write_qc_mqc_table(path, qc_summaries):
     for column in SUMMARY_COLUMNS:
         if column.startswith(("min_", "max_")) or column in (
             "qc_date",
-            "exomeqc_version",
+            "sequencingqc_version",
             "sites_no_likelihoods",
         ):
             header += [

@@ -4,7 +4,7 @@ description: |
   Write the VCF header of the merged fingerprint database with exactly one
   ##SAMPLE fingerprint QC line per fingerprint: this run's new QC lines,
   the QC lines of earlier fingerprints from the database, and
-  ExomeqcFingerprintQC=NOT_RECORDED for fingerprints added before the QC
+  SequencingqcFingerprintQC=NOT_RECORDED for fingerprints added before the QC
   existed. Outdated lines of replaced or removed fingerprints are dropped.
   The header is applied with bcftools reheader.
 keywords:
@@ -14,14 +14,14 @@ keywords:
   - qc
 tools:
   - "fingerprint_database_header.py":
-      description: "exomeqc script (bin/) that writes the fingerprint database header"
-      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
+      description: "sequencingqc script (bin/) that writes the fingerprint database header"
+      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-sequencing-qc"
       licence: ["MIT"]
       identifier: ""
 input:
   - - meta:
         type: map
-        description: Database metadata map, e.g. `[ id:'exomeqc_fingerprint_database_20260101-120000' ]`
+        description: Database metadata map, e.g. `[ id:'sequencingqc_fingerprint_database_20260101-120000' ]`
     - database:
         type: file
         description: Merged fingerprint database (bgzip VCF)

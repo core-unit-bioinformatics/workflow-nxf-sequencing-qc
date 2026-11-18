@@ -16,8 +16,8 @@ keywords:
   - vcf
 tools:
   - "fingerprint_qc.py":
-      description: "exomeqc script (bin/) for the QC of a fingerprint from a samtools mpileup"
-      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
+      description: "sequencingqc script (bin/) for the QC of a fingerprint from a samtools mpileup"
+      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-sequencing-qc"
       licence: ["MIT"]
       identifier: ""
 input:

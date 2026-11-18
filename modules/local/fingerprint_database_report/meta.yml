@@ -15,8 +15,8 @@ keywords:
   - qc
 tools:
   - "fingerprint_database_report.py":
-      description: "exomeqc script (bin/) that summarises the fingerprint check and classifies comparisons with other runs by LOD score"
-      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-exomeqc"
+      description: "sequencingqc script (bin/) that summarises the fingerprint check and classifies comparisons with other runs by LOD score"
+      homepage: "https://github.com/core-unit-bioinformatics/workflow-nxf-sequencing-qc"
       licence: ["MIT"]
       identifier: ""
 input:

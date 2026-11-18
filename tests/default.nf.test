@@ -23,7 +23,7 @@ nextflow_pipeline {
 
         then {
             // the updated database is named with the start time of the run
-            def database_pattern = 'fingerprintcheck/database/exomeqc_fingerprint_database_*'
+            def database_pattern = 'fingerprintcheck/database/sequencingqc_fingerprint_database_*'
             // stable_path: All files + folders in ${params.outdir}/ with a stable path (including file name)
             def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/*_multiqc_report_plots/**', database_pattern])
             // stable_content: All files in ${params.outdir}/ with stable content
@@ -38,16 +38,16 @@ nextflow_pipeline {
                 def fields = line.split('\t')
                 columns.collect { i -> fields[i].replaceAll(/.*\//, '') }.join('\t')
             }.sort() // BAM input order (and thus row order) is not deterministic
-            def databases = new File("${params.outdir}/fingerprintcheck/database").listFiles().findAll { f -> f.name.startsWith('exomeqc_fingerprint_database_') }.collect { f -> f.name }.sort()
+            def databases = new File("${params.outdir}/fingerprintcheck/database").listFiles().findAll { f -> f.name.startsWith('sequencingqc_fingerprint_database_') }.collect { f -> f.name }.sort()
             def summary = path("${params.outdir}/fingerprintcheck/database/fingerprint_database_summary.tsv").readLines()
             // MultiQC names its data directory after the report title
             def multiqc_data = new File("${params.outdir}/multiqc").listFiles().find { dir -> dir.name.endsWith('multiqc_report_data') }
             def multiqc_report = new File("${params.outdir}/multiqc").listFiles().find { f -> f.name.endsWith('multiqc_report.html') }
             assert workflow.success
             assertAll(
-                // one updated database with index, named exomeqc_fingerprint_database_<YYYYMMDD-hhmmss>
+                // one updated database with index, named sequencingqc_fingerprint_database_<YYYYMMDD-hhmmss>
                 { assert databases.size() == 2 },
-                { assert databases[0] ==~ /exomeqc_fingerprint_database_\d{8}-\d{6}\.vcf\.gz/ },
+                { assert databases[0] ==~ /sequencingqc_fingerprint_database_\d{8}-\d{6}\.vcf\.gz/ },
                 { assert databases[1] == "${databases[0]}.tbi".toString() },
                 { assert summary.contains("updated_database_file\t${databases[0]}".toString()) },
                 // the Picard heatmap shows only this run's crosscheck (a database crosscheck is excluded)

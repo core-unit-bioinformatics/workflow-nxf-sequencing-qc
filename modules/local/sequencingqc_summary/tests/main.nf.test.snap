@@ -2,7 +2,7 @@
     "synthetic dragen + cnv + fingerprint": {
         "content": [
             [
-                "exomeqc_summary.tsv:md5,dd082f6a6949668459ecea8c4b818845"
+                "sequencingqc_summary.tsv:md5,dd082f6a6949668459ecea8c4b818845"
             ],
             [
                 "biomarker.tsv:md5,9c2aca150e594eff565e6cf84fa72ec5"
@@ -10,15 +10,15 @@
             {
                 "versions_python": [
                     [
-                        "EXOMEQC_SUMMARY",
+                        "SEQUENCINGQC_SUMMARY",
                         "python",
                         "3.9.23"
                     ]
                 ],
                 "versions_script": [
                     [
-                        "EXOMEQC_SUMMARY",
-                        "exomeqc_summary.py",
+                        "SEQUENCINGQC_SUMMARY",
+                        "sequencingqc_summary.py",
                         "1.0.0"
                     ]
                 ]
@@ -33,10 +33,10 @@
     "synthetic dragen - stub": {
         "content": [
             [
-                "exomeqc_summary.html:md5,d41d8cd98f00b204e9800998ecf8427e"
+                "sequencingqc_summary.html:md5,d41d8cd98f00b204e9800998ecf8427e"
             ],
             [
-                "exomeqc_summary.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                "sequencingqc_summary.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
             ],
             [
                 "biomarker.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
@@ -51,7 +51,7 @@
     "synthetic dragen only": {
         "content": [
             [
-                "exomeqc_summary.tsv:md5,f71dd30446700d246ad6de2684a826c2"
+                "sequencingqc_summary.tsv:md5,f71dd30446700d246ad6de2684a826c2"
             ],
             [
                 "biomarker.tsv:md5,9c2aca150e594eff565e6cf84fa72ec5"

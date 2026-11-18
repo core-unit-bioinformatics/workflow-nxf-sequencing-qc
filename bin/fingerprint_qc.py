@@ -104,14 +104,14 @@ MIN_ALLELE_FREQUENCY = 1e-3
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # key of the ##SAMPLE header line holding the QC status
-SAMPLE_QC_KEY = "ExomeqcFingerprintQC"
+SAMPLE_QC_KEY = "SequencingqcFingerprintQC"
 # (summary column, ##SAMPLE key) in the order written; the summary table
 # starts with fingerprint_id, sample and runid
 SUMMARY_FIELDS = [
     ("status", SAMPLE_QC_KEY),
     ("failed_criteria", "FailedCriteria"),
     ("qc_date", "QCDate"),
-    ("exomeqc_version", "ExomeqcVersion"),
+    ("sequencingqc_version", "SequencingqcVersion"),
     ("haplotype_sites", "HaplotypeSites"),
     ("passing_sites", "PassingSites"),
     ("fraction_passing_sites", "FractionPassingSites"),
@@ -139,13 +139,13 @@ ANNOTATE_COLUMNS = (
 )
 
 HEADER_DEFINITIONS = [
-    '##FORMAT=<ID=FT,Number=1,Type=String,Description="exomeqc fingerprint QC of the site: PASS or the failed filters (FpLowDepth, FpLowBaseQuality, FpNoLikelihoods); PL of failed sites is set to 0,0,0">',
-    '##FORMAT=<ID=FPDP,Number=1,Type=Integer,Description="exomeqc fingerprint QC: bases with base and mapping quality at least MinBaseQuality and MinMappingQuality of the ##SAMPLE line">',
-    '##FORMAT=<ID=FPAD,Number=R,Type=Integer,Description="exomeqc fingerprint QC: REF and ALT bases counted in FPDP">',
-    '##FORMAT=<ID=FPBQ,Number=1,Type=Float,Description="exomeqc fingerprint QC: mean base quality of the bases with mapping quality at least MinMappingQuality">',
-    '##FILTER=<ID=FpLowDepth,Description="exomeqc fingerprint QC: FPDP below MinSiteDepth of the ##SAMPLE line">',
-    '##FILTER=<ID=FpLowBaseQuality,Description="exomeqc fingerprint QC: FPBQ below MinSiteMeanBaseQuality of the ##SAMPLE line">',
-    '##FILTER=<ID=FpNoLikelihoods,Description="exomeqc fingerprint QC: no genotype likelihoods (PL) in the fingerprint">',
+    '##FORMAT=<ID=FT,Number=1,Type=String,Description="sequencingqc fingerprint QC of the site: PASS or the failed filters (FpLowDepth, FpLowBaseQuality, FpNoLikelihoods); PL of failed sites is set to 0,0,0">',
+    '##FORMAT=<ID=FPDP,Number=1,Type=Integer,Description="sequencingqc fingerprint QC: bases with base and mapping quality at least MinBaseQuality and MinMappingQuality of the ##SAMPLE line">',
+    '##FORMAT=<ID=FPAD,Number=R,Type=Integer,Description="sequencingqc fingerprint QC: REF and ALT bases counted in FPDP">',
+    '##FORMAT=<ID=FPBQ,Number=1,Type=Float,Description="sequencingqc fingerprint QC: mean base quality of the bases with mapping quality at least MinMappingQuality">',
+    '##FILTER=<ID=FpLowDepth,Description="sequencingqc fingerprint QC: FPDP below MinSiteDepth of the ##SAMPLE line">',
+    '##FILTER=<ID=FpLowBaseQuality,Description="sequencingqc fingerprint QC: FPBQ below MinSiteMeanBaseQuality of the ##SAMPLE line">',
+    '##FILTER=<ID=FpNoLikelihoods,Description="sequencingqc fingerprint QC: no genotype likelihoods (PL) in the fingerprint">',
 ]
 
 
@@ -174,7 +174,7 @@ def parse_args(argv):
         help="check the contamination with this maximum; without it, no contamination check",
     )
     parser.add_argument("--qc-date", required=True, help="date of the QC, YYYY-MM-DD")
-    parser.add_argument("--exomeqc-version", required=True)
+    parser.add_argument("--sequencingqc-version", required=True)
     parser.add_argument("--prefix", required=True)
     args = parser.parse_args(argv)
     # thresholds must be in their valid ranges, else results are meaningless
@@ -201,9 +201,11 @@ def parse_args(argv):
             )
     if not ISO_DATE.match(args.qc_date):
         fail(f"--qc-date '{args.qc_date}' is not of the form YYYY-MM-DD")
-    if not args.exomeqc_version or re.search(r"[\s,<>=\"]", args.exomeqc_version):
+    if not args.sequencingqc_version or re.search(
+        r"[\s,<>=\"]", args.sequencingqc_version
+    ):
         fail(
-            f"--exomeqc-version '{args.exomeqc_version}' is empty or contains whitespace, ',', '<', '>', '=' or '\"'"
+            f"--sequencingqc-version '{args.sequencingqc_version}' is empty or contains whitespace, ',', '<', '>', '=' or '\"'"
         )
     return args
 
@@ -490,7 +492,7 @@ def summarise(sites_qc, contamination, contamination_sites, args):
         "status": "FAIL" if failed else "PASS",
         "failed_criteria": "|".join(failed) if failed else MISSING,
         "qc_date": args.qc_date,
-        "exomeqc_version": args.exomeqc_version,
+        "sequencingqc_version": args.sequencingqc_version,
         "haplotype_sites": str(total),
         "passing_sites": str(passing),
         "fraction_passing_sites": f"{fraction:.3f}",
