@@ -130,11 +130,6 @@ workflow SEQUENCINGQC {
                 "or set 'enable_cnvqc: false' in a -params-file for data from other CNV callers.")
         }
 
-        // add dragen folder to multiqc
-        ch_dragen_dirs         = params.dragen_dirs ? Channel.fromPath(params.dragen_dirs).collect() : []
-        ch_multiqc_files       = ch_multiqc_files.mix(ch_dragen_dirs)
-
-
         DRAGEN_CNV_QC(params.dragen_dirs)
 
         ch_multiqc_files       = ch_multiqc_files.mix(DRAGEN_CNV_QC.out.metrics)
